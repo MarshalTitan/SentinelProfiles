@@ -18,7 +18,7 @@ try {
     # ZipArchive preserves the separator used by the platform that produced the
     # package. Normalize before validating so Windows-built packages and locally
     # built packages are checked identically.
-    $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\\', '/') })
+    $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
     $required = @(
         'SentinelProfiles.dll',
         'SentinelProfiles.json',
