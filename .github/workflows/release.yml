@@ -1,8 +1,7 @@
 name: Publish Beta
 
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -16,7 +15,7 @@ jobs:
     runs-on: windows-latest
 
     steps:
-      - name: Check out release tag
+      - name: Check out release source
         uses: actions/checkout@v4
 
       - name: Set up .NET
@@ -33,7 +32,7 @@ jobs:
           Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
           Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
 
-      - name: Validate version and immutable release tag
+      - name: Validate version and immutable release
         id: version
         shell: pwsh
         env:
@@ -44,9 +43,7 @@ jobs:
           if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
             throw "Version must contain four numeric components: $version"
           }
-          if ($env:GITHUB_REF_NAME -ne "v$version") {
-            throw "Release tag '$env:GITHUB_REF_NAME' does not match project version '$version'."
-          }
+          $tag = "v$version"
           $entry = @(Get-Content -LiteralPath 'repo.json' -Raw | ConvertFrom-Json) | Select-Object -First 1
           if ($entry.InternalName -ne 'SentinelProfiles' -or $entry.AssemblyVersion -ne $version) {
             throw 'repo.json must contain SentinelProfiles at the project version before release.'
@@ -55,11 +52,12 @@ jobs:
           if ($entry.DownloadLinkInstall -ne $expectedAsset) {
             throw "repo.json release URL does not match: $expectedAsset"
           }
-          gh release view $env:GITHUB_REF_NAME --repo '${{ github.repository }}' *> $null
+          gh release view $tag --repo '${{ github.repository }}' *> $null
           if ($LASTEXITCODE -eq 0) {
-            throw "Release '$env:GITHUB_REF_NAME' already exists. Increment the version; existing releases are immutable."
+            throw "Release '$tag' already exists. Increment the version; existing releases are immutable."
           }
           "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
 
       - name: Restore locked dependencies
         run: dotnet restore SentinelProfiles.csproj --locked-mode
@@ -86,9 +84,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME "$env:RUNNER_TEMP\SentinelProfiles.zip" `
+          gh release create '${{ steps.version.outputs.tag }}' "$env:RUNNER_TEMP\SentinelProfiles.zip" `
             --repo '${{ github.repository }}' `
-            --verify-tag `
+            --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
             --notes "First usable Sentinel Profiles beta. Manual in-game validation is required for each installed-plugin collection layout." `
             --prerelease
@@ -96,7 +94,7 @@ jobs:
       - name: Verify public release asset
         shell: pwsh
         run: |
-          $url = "https://github.com/${{ github.repository }}/releases/download/$env:GITHUB_REF_NAME/SentinelProfiles.zip"
+          $url = "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelProfiles.zip"
           $download = Join-Path $env:RUNNER_TEMP 'public-SentinelProfiles.zip'
           for ($attempt = 1; $attempt -le 12; $attempt++) {
             try {
@@ -141,7 +139,7 @@ jobs:
           -ManifestPath 'central-catalog/repo.json'
           -InternalName 'SentinelProfiles'
           -Version '${{ steps.version.outputs.value }}'
-          -ReleaseAssetUrl 'https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/SentinelProfiles.zip'
+          -ReleaseAssetUrl 'https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelProfiles.zip'
 
       - name: Validate and publish central catalog update
         if: steps.catalog-auth.outputs.enabled == 'true'

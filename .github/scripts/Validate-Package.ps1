@@ -15,7 +15,10 @@ if (-not (Test-Path -LiteralPath $PackagePath -PathType Leaf)) {
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path -LiteralPath $PackagePath))
 try {
-    $names = @($archive.Entries | ForEach-Object FullName)
+    # ZipArchive preserves the separator used by the platform that produced the
+    # package. Normalize before validating so Windows-built packages and locally
+    # built packages are checked identically.
+    $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\\', '/') })
     $required = @(
         'SentinelProfiles.dll',
         'SentinelProfiles.json',
