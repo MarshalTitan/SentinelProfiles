@@ -1,0 +1,31 @@
+[
+  {
+    "Author": "MTitan",
+    "Name": "Sentinel Profiles",
+    "Punchline": "Reliable, manual three-state switching for installed Dalamud plugins.",
+    "Description": "Create named profiles from the live installed-plugin list, assign literal Enable, Leave Alone, or Disable rules, apply them on demand with disable-first ordering and per-plugin verification, and detect drift without continuously enforcing state.",
+    "InternalName": "SentinelProfiles",
+    "AssemblyVersion": "0.1.0.0",
+    "TestingAssemblyVersion": "0.1.0.0",
+    "RepoUrl": "https://github.com/MarshalTitan/SentinelProfiles",
+    "IconUrl": "https://raw.githubusercontent.com/MarshalTitan/SentinelProfiles/main/assets/icon.png",
+    "ApplicableVersion": "any",
+    "DalamudApiLevel": 15,
+    "TestingDalamudApiLevel": 15,
+    "IsHide": false,
+    "IsTestingExclusive": false,
+    "DownloadCount": 0,
+    "LastUpdate": 1789342837,
+    "LoadPriority": 0,
+    "DownloadLinkInstall": "https://github.com/MarshalTitan/SentinelProfiles/releases/download/v0.1.0.0/SentinelProfiles.zip",
+    "DownloadLinkUpdate": "https://github.com/MarshalTitan/SentinelProfiles/releases/download/v0.1.0.0/SentinelProfiles.zip",
+    "DownloadLinkTesting": "https://github.com/MarshalTitan/SentinelProfiles/releases/download/v0.1.0.0/SentinelProfiles.zip",
+    "Tags": [
+      "plugins",
+      "profiles",
+      "collections",
+      "utility",
+      "sentinel"
+    ]
+  }
+]

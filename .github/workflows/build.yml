@@ -1,0 +1,64 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download current Dalamud development assemblies
+        shell: pwsh
+        run: |
+          $dalamudDir = "$env:AppData\XIVLauncher\addon\Hooks\dev"
+          New-Item -ItemType Directory -Path $dalamudDir -Force | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP 'dalamud-latest.zip'
+          Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
+
+      - name: Restore locked dependencies
+        run: dotnet restore SentinelProfiles.csproj --locked-mode
+
+      - name: Read version
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$project = Get-Content -LiteralPath 'SentinelProfiles.csproj' -Raw
+          $version = [string]$project.Project.PropertyGroup.Version
+          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') { throw "Invalid version: $version" }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Run core behavior tests
+        run: dotnet run --project SentinelProfiles.Core.Tests/SentinelProfiles.Core.Tests.csproj -c Release
+
+      - name: Build release package
+        run: dotnet build SentinelProfiles.csproj -c Release --no-restore
+
+      - name: Validate installable package
+        shell: pwsh
+        run: >-
+          ./.github/scripts/Validate-Package.ps1
+          -PackagePath 'bin/Release/SentinelProfiles/latest.zip'
+          -ExpectedVersion '${{ steps.version.outputs.value }}'
+
+      - name: Upload installable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: SentinelProfiles-${{ steps.version.outputs.value }}
+          path: bin/Release/SentinelProfiles/latest.zip
+          if-no-files-found: error

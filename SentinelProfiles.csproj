@@ -1,0 +1,20 @@
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
+  <PropertyGroup>
+    <Version>0.1.0.0</Version>
+    <Author>MTitan</Author>
+    <Name>Sentinel Profiles</Name>
+    <Punchline>Reliable, manual three-state switching for installed Dalamud plugins.</Punchline>
+    <Description>Create named plugin profiles whose entries explicitly Enable, Disable, or Leave Alone installed Dalamud plugins, then apply and verify each profile on demand.</Description>
+    <RepoUrl>https://github.com/MarshalTitan/SentinelProfiles</RepoUrl>
+    <IconUrl>https://raw.githubusercontent.com/MarshalTitan/SentinelProfiles/main/assets/icon.png</IconUrl>
+    <Tags>plugins;profiles;collections;utility;sentinel</Tags>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Remove="SentinelProfiles.Core.Tests/**/*.cs" />
+    <None Include="assets/icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

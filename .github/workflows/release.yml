@@ -1,0 +1,163 @@
+name: Publish Beta
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-beta
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Download current Dalamud development assemblies
+        shell: pwsh
+        run: |
+          $dalamudDir = "$env:AppData\XIVLauncher\addon\Hooks\dev"
+          New-Item -ItemType Directory -Path $dalamudDir -Force | Out-Null
+          $archive = Join-Path $env:RUNNER_TEMP 'dalamud-latest.zip'
+          Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
+          Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
+
+      - name: Validate version and immutable release tag
+        id: version
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [xml]$project = Get-Content -LiteralPath 'SentinelProfiles.csproj' -Raw
+          $version = [string]$project.Project.PropertyGroup.Version
+          if ($version -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+            throw "Version must contain four numeric components: $version"
+          }
+          if ($env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Release tag '$env:GITHUB_REF_NAME' does not match project version '$version'."
+          }
+          $entry = @(Get-Content -LiteralPath 'repo.json' -Raw | ConvertFrom-Json) | Select-Object -First 1
+          if ($entry.InternalName -ne 'SentinelProfiles' -or $entry.AssemblyVersion -ne $version) {
+            throw 'repo.json must contain SentinelProfiles at the project version before release.'
+          }
+          $expectedAsset = "https://github.com/MarshalTitan/SentinelProfiles/releases/download/v$version/SentinelProfiles.zip"
+          if ($entry.DownloadLinkInstall -ne $expectedAsset) {
+            throw "repo.json release URL does not match: $expectedAsset"
+          }
+          gh release view $env:GITHUB_REF_NAME --repo '${{ github.repository }}' *> $null
+          if ($LASTEXITCODE -eq 0) {
+            throw "Release '$env:GITHUB_REF_NAME' already exists. Increment the version; existing releases are immutable."
+          }
+          "value=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Restore locked dependencies
+        run: dotnet restore SentinelProfiles.csproj --locked-mode
+
+      - name: Run core behavior tests
+        run: dotnet run --project SentinelProfiles.Core.Tests/SentinelProfiles.Core.Tests.csproj -c Release
+
+      - name: Build release package
+        run: dotnet build SentinelProfiles.csproj -c Release --no-restore
+
+      - name: Validate installable package
+        shell: pwsh
+        run: >-
+          ./.github/scripts/Validate-Package.ps1
+          -PackagePath 'bin/Release/SentinelProfiles/latest.zip'
+          -ExpectedVersion '${{ steps.version.outputs.value }}'
+
+      - name: Prepare named release asset
+        shell: pwsh
+        run: Copy-Item -LiteralPath 'bin/Release/SentinelProfiles/latest.zip' -Destination "$env:RUNNER_TEMP\SentinelProfiles.zip" -Force
+
+      - name: Publish immutable GitHub prerelease
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME "$env:RUNNER_TEMP\SentinelProfiles.zip" `
+            --repo '${{ github.repository }}' `
+            --verify-tag `
+            --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
+            --notes "First usable Sentinel Profiles beta. Manual in-game validation is required for each installed-plugin collection layout." `
+            --prerelease
+
+      - name: Verify public release asset
+        shell: pwsh
+        run: |
+          $url = "https://github.com/${{ github.repository }}/releases/download/$env:GITHUB_REF_NAME/SentinelProfiles.zip"
+          $download = Join-Path $env:RUNNER_TEMP 'public-SentinelProfiles.zip'
+          for ($attempt = 1; $attempt -le 12; $attempt++) {
+            try {
+              Invoke-WebRequest -Uri "$url`?release=${{ github.run_id }}-$attempt" -OutFile $download
+              if ((Get-Item $download).Length -gt 0) { break }
+            }
+            catch {
+              if ($attempt -eq 12) { throw }
+              Start-Sleep -Seconds 5
+            }
+          }
+          ./.github/scripts/Validate-Package.ps1 -PackagePath $download -ExpectedVersion '${{ steps.version.outputs.value }}'
+
+      - name: Detect central catalog authorization
+        id: catalog-auth
+        shell: pwsh
+        env:
+          CATALOG_TOKEN: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CATALOG_TOKEN)) {
+            "enabled=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+            Write-Host "::notice::DALAMUD_CATALOG_TOKEN is not configured. Update MarshalTitan/Sentinel manually for this release."
+          }
+          else {
+            "enabled=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          }
+
+      - name: Check out central catalog
+        if: steps.catalog-auth.outputs.enabled == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: MarshalTitan/Sentinel
+          ref: main
+          token: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
+          path: central-catalog
+
+      - name: Update only SentinelProfiles in central catalog
+        if: steps.catalog-auth.outputs.enabled == 'true'
+        shell: pwsh
+        run: >-
+          ./central-catalog/.github/scripts/Update-PluginEntry.ps1
+          -ManifestPath 'central-catalog/repo.json'
+          -InternalName 'SentinelProfiles'
+          -Version '${{ steps.version.outputs.value }}'
+          -ReleaseAssetUrl 'https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/SentinelProfiles.zip'
+
+      - name: Validate and publish central catalog update
+        if: steps.catalog-auth.outputs.enabled == 'true'
+        shell: pwsh
+        working-directory: central-catalog
+        run: |
+          ./.github/scripts/Test-Catalog.ps1 `
+            -CatalogPath 'repo.json' `
+            -VerifyRemoteAssets `
+            -ExpectedInternalName 'SentinelProfiles' `
+            -ExpectedVersion '${{ steps.version.outputs.value }}'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- repo.json
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m "Update SentinelProfiles to ${{ steps.version.outputs.value }}"
+            git push origin HEAD:main
+          }

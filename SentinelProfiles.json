@@ -1,0 +1,9 @@
+{
+  "Name": "Sentinel Profiles",
+  "Author": "MTitan",
+  "Punchline": "Reliable, manual three-state switching for installed Dalamud plugins.",
+  "Description": "Create named plugin profiles whose entries explicitly Enable, Disable, or Leave Alone installed Dalamud plugins, then apply and verify each profile on demand.",
+  "RepoUrl": "https://github.com/MarshalTitan/SentinelProfiles",
+  "IconUrl": "https://raw.githubusercontent.com/MarshalTitan/SentinelProfiles/main/assets/icon.png",
+  "Tags": ["plugins", "profiles", "collections", "utility", "sentinel"]
+}
