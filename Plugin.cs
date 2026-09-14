@@ -134,6 +134,13 @@ public sealed class Plugin : IDalamudPlugin
             $"[Sentinel Profiles] {result.Enabled} enabled, {result.Disabled} disabled, "
             + $"{result.AlreadyCorrect} already correct, {result.LeftAlone} left alone.");
 
+        if (result.Problems.Count > 0)
+        {
+            ChatGui.Print(
+                $"[Sentinel Profiles] {result.Failed} failed, {result.Missing} missing, "
+                + $"{result.Unsupported} unsupported or protected.");
+        }
+
         foreach (var problem in result.Problems)
             ChatGui.PrintError($"[Sentinel Profiles] {problem.DisplayName}: {problem.Reason}");
     }

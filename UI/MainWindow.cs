@@ -175,20 +175,27 @@ public sealed class MainWindow : Window
                 $"{result.Enabled} enabled  |  {result.Disabled} disabled  |  "
                 + $"{result.AlreadyCorrect} already correct  |  {result.LeftAlone} left alone");
 
-            if (result.Problems.Count > 0 && ImGui.TreeNode($"Problems ({result.Problems.Count})##last-apply-problems"))
+            if (result.Problems.Count > 0)
             {
-                foreach (var problem in result.Problems)
-                {
-                    ImGui.BulletText($"{problem.DisplayName}: {problem.Reason}");
-                    if (configuration.ShowInternalNames
-                        && !problem.DisplayName.Equals(problem.InternalName, StringComparison.OrdinalIgnoreCase))
-                    {
-                        ImGui.SameLine();
-                        ImGui.TextDisabled($"[{problem.InternalName}]");
-                    }
-                }
+                ImGui.TextDisabled(
+                    $"{result.Failed} failed  |  {result.Missing} missing  |  "
+                    + $"{result.Unsupported} unsupported or protected");
 
-                ImGui.TreePop();
+                if (ImGui.TreeNode($"Problems ({result.Problems.Count})##last-apply-problems"))
+                {
+                    foreach (var problem in result.Problems)
+                    {
+                        ImGui.BulletText($"{problem.DisplayName}: {problem.Reason}");
+                        if (configuration.ShowInternalNames
+                            && !problem.DisplayName.Equals(problem.InternalName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            ImGui.SameLine();
+                            ImGui.TextDisabled($"[{problem.InternalName}]");
+                        }
+                    }
+
+                    ImGui.TreePop();
+                }
             }
         }
 
