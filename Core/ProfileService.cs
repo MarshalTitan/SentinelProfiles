@@ -163,7 +163,22 @@ public sealed class ProfileService
     private bool Normalize()
     {
         var didChange = false;
+        var sourceVersion = configuration.Version;
         configuration.Profiles ??= [];
+
+        if (sourceVersion < 2)
+        {
+            // Sentinel Modern is opt-in. Existing schema-one users retain the
+            // presentation they had before the theme selector was introduced.
+            configuration.Theme = 0;
+            didChange = true;
+        }
+
+        if (configuration.Theme is < 0 or > 1)
+        {
+            configuration.Theme = 0;
+            didChange = true;
+        }
 
         var ids = new HashSet<Guid>();
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

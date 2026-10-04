@@ -90,7 +90,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "First usable Sentinel Profiles beta. Manual in-game validation is required for each installed-plugin collection layout." `
+            --notes "Adds the opt-in Sentinel Modern configuration experience from SentinelCore 0.2.0 while preserving the Classic interface and all profile behavior. Existing users migrate explicitly to Classic. Manual in-game validation remains required for each installed-plugin collection layout." `
             --prerelease
 
       - name: Verify public release asset

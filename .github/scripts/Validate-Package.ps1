@@ -21,6 +21,8 @@ try {
     $names = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
     $required = @(
         'SentinelProfiles.dll',
+        'SentinelCore.dll',
+        'SentinelCore.UI.dll',
         'SentinelProfiles.json',
         'SentinelProfiles.deps.json',
         'assets/icon.png'

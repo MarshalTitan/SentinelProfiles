@@ -13,6 +13,20 @@
         "requested": "[1.2.39, )",
         "resolved": "1.2.39",
         "contentHash": "fcFN01tDTIQqDuTwr1jUQK/geofiwjG5DycJQOnC72i1SsLAk1ELe+apBOuZ11UMQG8YKFZG1FgvjZPbqHyatg=="
+      },
+      "MarshalTitan.SentinelCore.UI": {
+        "type": "Direct",
+        "requested": "[0.2.0, 0.2.0]",
+        "resolved": "0.2.0",
+        "contentHash": "Fc1YUp5/+8y8U52hQeEb2aZShhB99F7XcwDhNsCoEae5Dt9PlM4GEd7uW8TupWM/MvwSchjFJl/twLNu0zryAw==",
+        "dependencies": {
+          "MarshalTitan.SentinelCore": "0.2.0"
+        }
+      },
+      "MarshalTitan.SentinelCore": {
+        "type": "Transitive",
+        "resolved": "0.2.0",
+        "contentHash": "vtpSMJU3JE9NUwACnPzjGcyTDLER8Pb/yS1psOgKd0hEYysczkW+KAIieLczHBYhAEjJcICaFVjPdslz6545JQ=="
       }
     }
   }

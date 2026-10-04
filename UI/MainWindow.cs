@@ -2,6 +2,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
+using SentinelCore.UI;
 using SentinelProfiles.Core;
 using SentinelProfiles.Models;
 using SentinelProfiles.Services;
@@ -11,6 +12,8 @@ namespace SentinelProfiles.UI;
 public sealed class MainWindow : Window
 {
     private const float ProfilePaneWidth = 235f;
+
+    private static readonly string[] ConfigurationThemes = ["Classic", "Sentinel Modern"];
 
     private static readonly string[] FilterLabels =
     [
@@ -41,6 +44,9 @@ public sealed class MainWindow : Window
     private readonly Func<ApplyOrigin, bool> reapplyLastProfile;
     private readonly Action saveConfiguration;
     private readonly HashSet<string> selectedPlugins = new(StringComparer.OrdinalIgnoreCase);
+    private readonly SentinelModernStyleScope modernStyle = new();
+    private readonly Action drawModernNavigation;
+    private readonly Action drawModernContent;
 
     private string search = string.Empty;
     private string modalName = string.Empty;
@@ -48,6 +54,7 @@ public sealed class MainWindow : Window
     private bool newModalOpen;
     private bool renameModalOpen;
     private bool deleteModalOpen;
+    private bool modernThemeActive;
 
     public MainWindow(
         Configuration configuration,
@@ -59,7 +66,7 @@ public sealed class MainWindow : Window
         Func<PluginProfile, ApplyOrigin, bool> applyProfile,
         Func<ApplyOrigin, bool> reapplyLastProfile,
         Action saveConfiguration)
-        : base("Sentinel Profiles##SentinelProfiles-Main", ImGuiWindowFlags.NoCollapse)
+        : base("Sentinel Profiles##SentinelProfiles-Main")
     {
         this.configuration = configuration;
         this.profiles = profiles;
@@ -70,6 +77,8 @@ public sealed class MainWindow : Window
         this.applyProfile = applyProfile;
         this.reapplyLastProfile = reapplyLastProfile;
         this.saveConfiguration = saveConfiguration;
+        drawModernNavigation = DrawModernNavigation;
+        drawModernContent = DrawModernContent;
 
         Size = new Vector2(1080, 720);
         SizeCondition = ImGuiCond.FirstUseEver;
@@ -79,10 +88,36 @@ public sealed class MainWindow : Window
         };
     }
 
+    public override void PreDraw()
+    {
+        modernThemeActive = SentinelThemeState<ModernPage>.NormalizeTheme(configuration.Theme)
+                            == SentinelThemeKind.Modern;
+        if (modernThemeActive)
+            modernStyle.Push(ImGuiHelpers.GlobalScale);
+    }
+
+    public override void PostDraw()
+    {
+        if (modernThemeActive)
+            modernStyle.Pop();
+    }
+
     public override void Draw()
     {
         discovery.RefreshIfDue();
-        DrawStatusHeader();
+        if (modernThemeActive)
+            DrawModernShell();
+        else
+            DrawClassicShell();
+
+        DrawModals();
+    }
+
+    public void Dispose() => modernStyle.Dispose();
+
+    private void DrawClassicShell()
+    {
+        DrawStatusHeader(false);
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -94,8 +129,28 @@ public sealed class MainWindow : Window
 
         ImGui.SameLine();
         if (ImGui.BeginChild("EditorPane", new Vector2(0, available.Y), true))
-            DrawEditorPane();
+            DrawEditorPane(false);
         ImGui.EndChild();
+    }
+
+    private void DrawModernShell()
+    {
+        var options = new SentinelModernShellOptions(
+            "SentinelProfiles",
+            "MARSHALTITAN  /  SENTINEL",
+            "SENTINEL PROFILES",
+            "Manual, three-state plugin configuration switching")
+        {
+            Scale = ImGuiHelpers.GlobalScale,
+            ContextLabel = "Sentinel Modern",
+            Status = GetModernStatus(),
+        };
+
+        SentinelModernConfigurationShell.Draw(options, drawModernNavigation, drawModernContent);
+    }
+
+    private void DrawModals()
+    {
 
         if (newModalOpen)
             ImGui.OpenPopup("Create Profile##SentinelProfiles");
@@ -109,11 +164,15 @@ public sealed class MainWindow : Window
         DrawDeleteModal();
     }
 
-    private void DrawStatusHeader()
+    private void DrawStatusHeader(bool modern)
     {
-        ImGui.TextColored(Gold, "SENTINEL PROFILES");
-        ImGui.SameLine();
-        ImGui.TextDisabled("Manual plugin configuration switching");
+        if (!modern)
+        {
+            ImGui.TextColored(Gold, "SENTINEL PROFILES");
+            ImGui.SameLine();
+            ImGui.TextDisabled("Manual plugin configuration switching");
+            DrawThemeSelector();
+        }
 
         var lastApplied = profiles.LastAppliedProfile;
         var drift = driftDetector.Evaluate(lastApplied, discovery.Snapshot);
@@ -123,7 +182,19 @@ public sealed class MainWindow : Window
         ImGui.SameLine();
         ImGui.Text("Status:");
         ImGui.SameLine();
-        switch (drift.State)
+        if (modern)
+        {
+            var (label, tone) = GetDriftPresentation(drift.State);
+            SentinelModernUi.StatusChip(label, tone, ImGuiHelpers.GlobalScale);
+            if (drift.State == DriftState.Drifted && ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.Text($"{drift.MismatchedInternalNames.Count} state mismatch(es)");
+                ImGui.Text($"{drift.MissingInternalNames.Count} missing managed plugin(s)");
+                ImGui.EndTooltip();
+            }
+        }
+        else switch (drift.State)
         {
             case DriftState.Matched:
                 ImGui.TextColored(Green, "Matched");
@@ -203,6 +274,116 @@ public sealed class MainWindow : Window
             ImGui.TextColored(Red, fatalError);
     }
 
+    private void DrawModernNavigation()
+    {
+        SentinelModernNavigation.GroupLabel("PROFILES");
+        ImGui.Spacing();
+
+        if (profiles.Profiles.Count == 0)
+        {
+            ImGui.TextWrapped("No profiles yet. Start with a Blank Profile to manage only the plugins you choose.");
+        }
+        else
+        {
+            foreach (var profile in profiles.Profiles)
+            {
+                var selected = profiles.SelectedProfile?.Id == profile.Id;
+                var suffix = profiles.LastAppliedProfile?.Id == profile.Id ? "  • LAST" : string.Empty;
+                if (SentinelModernNavigation.Item(
+                        profile.Id.ToString("N"),
+                        profile.Name + suffix,
+                        selected,
+                        ImGuiHelpers.GlobalScale))
+                {
+                    profiles.Select(profile.Id);
+                    selectedPlugins.Clear();
+                }
+            }
+        }
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        SentinelModernNavigation.GroupLabel("PROFILE ACTIONS");
+        ImGui.Spacing();
+        DrawProfileActions();
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        SentinelModernNavigation.GroupLabel("APPEARANCE");
+        DrawThemeSelector();
+    }
+
+    private void DrawModernContent()
+    {
+        DrawStatusHeader(true);
+        ImGui.Spacing();
+
+        var profile = profiles.SelectedProfile;
+        if (profile is null)
+        {
+            SentinelModernUi.PageHeading(
+                "Profile Editor",
+                "Create a profile to begin. Blank Profile keeps every plugin at literal Leave Alone until you choose otherwise.");
+            ImGui.Spacing();
+            using var emptyCard = SentinelModernCard.Begin("EmptyProfileEditor", Vector2.Zero);
+            if (emptyCard.IsVisible)
+            {
+                SentinelModernUi.SectionHeader("GET STARTED");
+                ImGui.TextWrapped(
+                    "Use New Profile in the sidebar. Editing a profile never changes live plugins; changes happen only when you apply it.");
+            }
+
+            return;
+        }
+
+        SentinelModernUi.PageHeading(
+            profile.Name,
+            $"{profile.PluginStates.Count} managed rule(s). Editing desired states does not change live plugins.");
+        ImGui.Spacing();
+        using var editorCard = SentinelModernCard.Begin("ProfileEditorCard", Vector2.Zero);
+        if (editorCard.IsVisible)
+            DrawEditorPane(true);
+    }
+
+    private SentinelModernStatus GetModernStatus()
+    {
+        if (coordinator.IsBusy)
+            return new SentinelModernStatus("APPLYING", SentinelModernStatusTone.Accent);
+        if (coordinator.FatalError is not null)
+            return new SentinelModernStatus("ERROR", SentinelModernStatusTone.Warning);
+
+        var drift = driftDetector.Evaluate(profiles.LastAppliedProfile, discovery.Snapshot);
+        var (label, tone) = GetDriftPresentation(drift.State);
+        return new SentinelModernStatus(label.ToUpperInvariant(), tone);
+    }
+
+    private static (string Label, SentinelModernStatusTone Tone) GetDriftPresentation(DriftState state)
+        => state switch
+        {
+            DriftState.Matched => ("Matched", SentinelModernStatusTone.Success),
+            DriftState.Drifted => ("Modified / Drifted", SentinelModernStatusTone.Warning),
+            _ => ("Not Applied", SentinelModernStatusTone.Neutral),
+        };
+
+    private void DrawThemeSelector()
+    {
+        var selectedTheme = (int)SentinelThemeState<ModernPage>.NormalizeTheme(configuration.Theme);
+        ImGui.SetNextItemWidth(modernThemeActive ? -1f : 180f * ImGuiHelpers.GlobalScale);
+        if (!ImGui.Combo(
+                "Theme##SentinelProfiles-Theme",
+                ref selectedTheme,
+                ConfigurationThemes,
+                ConfigurationThemes.Length))
+        {
+            return;
+        }
+
+        configuration.Theme = selectedTheme;
+        saveConfiguration();
+    }
+
     private void DrawProfilesPane()
     {
         ImGui.TextColored(Gold, "PROFILES");
@@ -234,6 +415,11 @@ public sealed class MainWindow : Window
 
         ImGui.Spacing();
         ImGui.Separator();
+        DrawProfileActions();
+    }
+
+    private void DrawProfileActions()
+    {
         ImGui.BeginDisabled(coordinator.IsBusy);
 
         if (ImGui.Button("New Profile", new Vector2(-1, 0)))
@@ -284,7 +470,7 @@ public sealed class MainWindow : Window
         ImGui.EndDisabled();
     }
 
-    private void DrawEditorPane()
+    private void DrawEditorPane(bool modern)
     {
         var profile = profiles.SelectedProfile;
         if (profile is null)
@@ -295,10 +481,13 @@ public sealed class MainWindow : Window
             return;
         }
 
-        ImGui.TextColored(Gold, profile.Name.ToUpperInvariant());
-        ImGui.SameLine();
-        ImGui.TextDisabled($"{profile.PluginStates.Count} managed rule(s)");
-        ImGui.TextDisabled("Editing desired states does not change live plugins. Apply the profile when ready.");
+        if (!modern)
+        {
+            ImGui.TextColored(Gold, profile.Name.ToUpperInvariant());
+            ImGui.SameLine();
+            ImGui.TextDisabled($"{profile.PluginStates.Count} managed rule(s)");
+            ImGui.TextDisabled("Editing desired states does not change live plugins. Apply the profile when ready.");
+        }
 
         ImGui.SetNextItemWidth(Math.Max(180f, ImGui.GetContentRegionAvail().X * 0.48f));
         ImGui.InputTextWithHint("##plugin-search", "Search plugins...", ref search, 128);
@@ -312,19 +501,34 @@ public sealed class MainWindow : Window
             saveConfiguration();
         }
 
-        ImGui.SameLine();
         var showInternalNames = configuration.ShowInternalNames;
-        if (ImGui.Checkbox("Internal names", ref showInternalNames))
+        if (modern)
         {
-            configuration.ShowInternalNames = showInternalNames;
-            saveConfiguration();
+            if (SentinelModernControls.Toggle(
+                    "ShowInternalNames",
+                    "Show internal plugin names",
+                    ref showInternalNames,
+                    ImGuiHelpers.GlobalScale))
+            {
+                configuration.ShowInternalNames = showInternalNames;
+                saveConfiguration();
+            }
+        }
+        else
+        {
+            ImGui.SameLine();
+            if (ImGui.Checkbox("Internal names", ref showInternalNames))
+            {
+                configuration.ShowInternalNames = showInternalNames;
+                saveConfiguration();
+            }
         }
 
         var rows = BuildRows(profile);
         selectedPlugins.RemoveWhere(internalName => rows.All(row => !row.InternalName.Equals(internalName, StringComparison.OrdinalIgnoreCase)));
         DrawBulkControls(profile, rows);
         ImGui.Spacing();
-        DrawPluginTable(profile, rows);
+        DrawPluginTable(profile, rows, modern);
     }
 
     private IReadOnlyList<PluginEditorRow> BuildRows(PluginProfile profile)
@@ -414,7 +618,10 @@ public sealed class MainWindow : Window
         }
     }
 
-    private void DrawPluginTable(PluginProfile profile, IReadOnlyList<PluginEditorRow> rows)
+    private void DrawPluginTable(
+        PluginProfile profile,
+        IReadOnlyList<PluginEditorRow> rows,
+        bool modern)
     {
         var flags = ImGuiTableFlags.RowBg
                     | ImGuiTableFlags.BordersInnerH
@@ -464,28 +671,32 @@ public sealed class MainWindow : Window
             }
 
             if (row.IsProtected)
-                ImGui.TextColored(Gold, "Protected");
+                DrawStatusValue("Protected", SentinelModernStatusTone.Violet, Gold, modern);
             else if (row.Plugin?.GetUnsupportedReason() is { } unsupported)
             {
-                ImGui.TextColored(Orange, "Unsupported for switching");
+                DrawStatusValue("Unsupported", SentinelModernStatusTone.Warning, Orange, modern);
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip(unsupported);
             }
             else if (row.Plugin is null)
-                ImGui.TextColored(Orange, "Missing / Not Installed");
+                DrawStatusValue("Missing / Not Installed", SentinelModernStatusTone.Warning, Orange, modern);
 
             ImGui.TableSetColumnIndex(2);
             if (row.Plugin is null)
-                ImGui.TextColored(Orange, "Missing");
+                DrawStatusValue("Missing", SentinelModernStatusTone.Warning, Orange, modern);
             else if (row.Plugin.IsLoaded)
-                ImGui.TextColored(Green, "Enabled");
+                DrawStatusValue("Enabled", SentinelModernStatusTone.Success, Green, modern);
             else
-                ImGui.TextColored(Muted, "Disabled");
+                DrawStatusValue("Disabled", SentinelModernStatusTone.Neutral, Muted, modern);
 
             ImGui.TableSetColumnIndex(3);
             if (row.IsProtected)
             {
-                ImGui.TextColored(Gold, "Protected - always enabled");
+                DrawStatusValue(
+                    "Protected - always enabled",
+                    SentinelModernStatusTone.Violet,
+                    Gold,
+                    modern);
             }
             else
             {
@@ -498,6 +709,18 @@ public sealed class MainWindow : Window
         }
 
         ImGui.EndTable();
+    }
+
+    private static void DrawStatusValue(
+        string text,
+        SentinelModernStatusTone modernTone,
+        Vector4 classicColour,
+        bool modern)
+    {
+        if (modern)
+            SentinelModernUi.StatusChip(text, modernTone, ImGuiHelpers.GlobalScale);
+        else
+            ImGui.TextColored(classicColour, text);
     }
 
     private void DrawStateSelector(PluginProfile profile, PluginEditorRow row)
@@ -659,4 +882,9 @@ public sealed class MainWindow : Window
         InstalledPluginInfo? Plugin,
         ProfilePluginState State,
         bool IsProtected);
+
+    private enum ModernPage
+    {
+        Profiles,
+    }
 }

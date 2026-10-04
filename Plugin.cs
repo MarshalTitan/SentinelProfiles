@@ -82,6 +82,7 @@ public sealed class Plugin : IDalamudPlugin
         CommandManager.RemoveHandler(CommandName);
         applicationCoordinator.Completed -= OnApplyCompleted;
         windows.RemoveAllWindows();
+        mainWindow.Dispose();
         applicationCoordinator.Dispose();
         runtime.Dispose();
         discovery.Dispose();

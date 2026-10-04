@@ -8,6 +8,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Capture creates a full snapshot except protected plugins", TestCapture),
     ("Duplicate is independent and deletion clears last applied", TestDuplicateAndDelete),
     ("Configuration data round-trips and normalizes", TestSerialization),
+    ("Schema-one configurations migrate explicitly to Classic", TestThemeMigration),
     ("Apply orders disables before enables and leaves unmanaged plugins alone", TestApplyOrdering),
     ("Apply preserves missing entries and continues after failures", TestPartialFailure),
     ("Reapply verifies an already-correct profile", TestReapply),
@@ -90,7 +91,7 @@ static Task TestDuplicateAndDelete()
 
 static Task TestSerialization()
 {
-    var data = new ProfileConfigurationData();
+    var data = new ProfileConfigurationData { Theme = 1 };
     var service = new ProfileService(data, new PluginSafetyPolicy(), () => { });
     service.TryCreateBlank("PvP", out var profile, out _);
     service.SetPluginState(profile!, "SomePlugin", "Some Plugin", ProfilePluginState.Disable);
@@ -102,6 +103,35 @@ static Task TestSerialization()
     var normalized = new ProfileService(restored, new PluginSafetyPolicy(), () => { });
     Assert(normalized.LastAppliedProfile?.Name == "PvP", "Last-applied ID should round-trip.");
     Assert(normalized.LastAppliedProfile?.GetState("someplugin") == ProfilePluginState.Disable, "InternalName map should normalize to case-insensitive lookup.");
+    Assert(restored.Theme == 1, "The selected Sentinel Modern theme should round-trip.");
+    return Task.CompletedTask;
+}
+
+static Task TestThemeMigration()
+{
+    var profileId = Guid.NewGuid();
+    var data = new ProfileConfigurationData
+    {
+        Version = 1,
+        Theme = 1,
+        SelectedProfileId = profileId,
+        LastAppliedProfileId = profileId,
+        Profiles =
+        [
+            new PluginProfile
+            {
+                Id = profileId,
+                Name = "Raid",
+            },
+        ],
+    };
+
+    _ = new ProfileService(data, new PluginSafetyPolicy(), () => { });
+
+    Assert(data.Version == ProfileConfigurationData.CurrentSchemaVersion, "Migration should advance the schema.");
+    Assert(data.Theme == 0, "Existing schema-one users should migrate to Classic.");
+    Assert(data.SelectedProfileId == profileId, "Migration must preserve the selected profile.");
+    Assert(data.LastAppliedProfileId == profileId, "Migration must preserve the last-applied profile.");
     return Task.CompletedTask;
 }
 

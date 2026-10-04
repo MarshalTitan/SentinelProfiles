@@ -1,6 +1,6 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.1.0.0</Version>
+    <Version>0.2.0.0</Version>
     <Author>MTitan</Author>
     <Name>Sentinel Profiles</Name>
     <Punchline>Reliable, manual three-state switching for installed Dalamud plugins.</Punchline>
@@ -16,5 +16,9 @@
   <ItemGroup>
     <Compile Remove="SentinelProfiles.Core.Tests/**/*.cs" />
     <None Include="assets/icon.png" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MarshalTitan.SentinelCore.UI" Version="[0.2.0]" />
   </ItemGroup>
 </Project>
