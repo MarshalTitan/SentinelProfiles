@@ -35,9 +35,12 @@ profile applied and reports whether its explicitly managed plugins still match.
 - Detects drift only from explicit Enable/Disable rules. Leave Alone never
   contributes to drift.
 - Offers **Classic** and **Sentinel Modern** configuration themes. Modern uses
-  the canonical `MarshalTitan.SentinelCore.UI` 0.2.0 shell, navigation, cards,
+  the canonical `MarshalTitan.SentinelCore.UI` 0.2.1 shell, navigation, cards,
   switches, status chips, styling, and ambient treatment; there is no runtime
   dependency on another installed Sentinel plugin.
+- Uses Core's corrected non-scrolling header and persistent left navigation
+  rail; profile headings, descriptions, and editor controls stay together in
+  the right content pane at every supported window width.
 - Migrates existing schema-one users explicitly to Classic without changing
   saved profiles, the selected profile, the last-applied profile, or window
   placement. Sentinel Modern remains an opt-in presentation choice.
@@ -134,8 +137,8 @@ bin/Release/SentinelProfiles/latest.zip
 - `Services/ApplicationCoordinator.cs` — lifecycle, progress, results, and
   shutdown cancellation.
 - `UI/MainWindow.cs` — profile list, editor, bulk controls, status, and reports.
-- `.packages/SentinelCore/v0.2.0.0/` — exact release packages pinned from
-  SentinelCore tag `v0.2.0.0` / commit `4886a207d003850a163f680e81cf3a714c4993cc`.
+- `.packages/SentinelCore/v0.2.1.0/` — exact release packages pinned from
+  SentinelCore tag `v0.2.1.0` / commit `d1c5798b42cc1e542db3786deaf03e449a991cd9`.
 - `SentinelProfiles.Core.Tests/` — dependency-free executable core test suite.
 
 ## Project boundaries
