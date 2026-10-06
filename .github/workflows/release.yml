@@ -90,7 +90,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "Adopts Sentinel Modern 2 from SentinelCore.UI 0.3.1 with one compact custom header, icon rail, unified surface, responsive settings rows, 0.9 ambient treatment, and reduced-motion support. Classic, saved theme selection, profiles, window identity, commands, and all switching behavior remain unchanged." `
+            --notes "Fixes Sentinel Modern minimize/restore by keeping the shared themed header visible, matching S Rank Sentinel. The minimized state and prior expanded size persist across restarts; Classic, profiles, window position, commands, and plugin switching behavior remain unchanged." `
             --prerelease
 
       - name: Verify public release asset

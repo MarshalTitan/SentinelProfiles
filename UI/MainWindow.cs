@@ -83,8 +83,8 @@ public sealed class MainWindow : Window
     private bool renameModalOpen;
     private bool deleteModalOpen;
     private bool modernThemeActive;
-    private bool modernCollapsed;
-    private bool expandOnNextDraw;
+    private Vector2 modernFrameWindowSize;
+    private Vector2? pendingModernSize;
     private ModernPage modernPage;
 
     public MainWindow(
@@ -134,30 +134,45 @@ public sealed class MainWindow : Window
         modernStyle.Pop();
         modernThemeActive = SentinelThemeState<ModernPage>.NormalizeTheme(configuration.Theme)
                             == SentinelThemeKind.Modern;
-        if (expandOnNextDraw)
-        {
-            ImGui.SetNextWindowCollapsed(false, ImGuiCond.Always);
-            expandOnNextDraw = false;
-            modernCollapsed = false;
-        }
 
         if (modernThemeActive)
         {
             var scale = ImGuiHelpers.GlobalScale;
             Flags = SentinelModernWindowChrome.UseCustomHeader(classicWindowFlags);
             modernStyle.PushAppShell(scale);
-            var shellMinimum = SentinelModernAppLayout.MinimumWindowSize(
-                scale,
-                hasSecondarySidebar: true);
+            var headerHeight = SentinelModernAppLayoutOptions.Default.HeaderHeight * scale;
+            var shellMinimum = SentinelModernAppLayout.MinimumWindowSize(scale, hasSecondarySidebar: true);
+            var collapsedMinimum = SentinelModernAppLayout.MinimumWindowSize(scale, hasSecondarySidebar: false);
             SizeConstraints = new WindowSizeConstraints
             {
-                MinimumSize = Vector2.Max(ClassicMinimumWindowSize * scale, shellMinimum),
+                MinimumSize = configuration.ModernWindowCollapsed
+                    ? new Vector2(collapsedMinimum.X, headerHeight)
+                    : Vector2.Max(ClassicMinimumWindowSize * scale, shellMinimum),
+                MaximumSize = configuration.ModernWindowCollapsed
+                    ? new Vector2(float.MaxValue, headerHeight)
+                    : new Vector2(float.MaxValue, float.MaxValue),
             };
+
+            // Modern collapse is represented by the custom header-height window, never by
+            // ImGui's native collapsed title bar. This also recovers saved native-collapse
+            // state left by the previous implementation.
+            ImGui.SetNextWindowCollapsed(false, ImGuiCond.Always);
         }
         else
         {
             Flags = classicWindowFlags;
             SizeConstraints = new WindowSizeConstraints { MinimumSize = ClassicMinimumWindowSize };
+        }
+
+        if (pendingModernSize is { } requestedSize)
+        {
+            Size = requestedSize;
+            SizeCondition = ImGuiCond.Always;
+            pendingModernSize = null;
+        }
+        else
+        {
+            SizeCondition = ImGuiCond.FirstUseEver;
         }
     }
 
@@ -204,6 +219,7 @@ public sealed class MainWindow : Window
 
     private void DrawModernShell()
     {
+        modernFrameWindowSize = ImGui.GetWindowSize();
         var options = new SentinelModernAppShellOptions(
             "SentinelProfiles.Modern2",
             "Sentinel Profiles",
@@ -219,6 +235,7 @@ public sealed class MainWindow : Window
             ContextLabel = GetModernContextLabel(),
             Status = GetModernStatusPill(),
             RequestCollapse = requestModernCollapse,
+            CollapseTooltip = configuration.ModernWindowCollapsed ? "Expand" : "Minimize",
             RequestClose = requestModernClose,
         };
 
@@ -228,7 +245,9 @@ public sealed class MainWindow : Window
             ModernPrimaryNavigation,
             selectModernPrimaryPage,
             drawModernPage,
-            modernPage == ModernPage.Profiles ? drawModernSecondaryNavigation : null);
+            !configuration.ModernWindowCollapsed && modernPage == ModernPage.Profiles
+                ? drawModernSecondaryNavigation
+                : null);
     }
 
     private void DrawModals()
@@ -413,6 +432,9 @@ public sealed class MainWindow : Window
 
     private void DrawModernPage()
     {
+        if (configuration.ModernWindowCollapsed)
+            return;
+
         if (modernPage == ModernPage.Appearance)
         {
             DrawModernAppearancePage();
@@ -552,12 +574,16 @@ public sealed class MainWindow : Window
     public void OpenAndExpand()
     {
         IsOpen = true;
-        expandOnNextDraw = true;
+        if (SentinelThemeState<ModernPage>.NormalizeTheme(configuration.Theme) == SentinelThemeKind.Modern
+            && configuration.ModernWindowCollapsed)
+        {
+            ExpandModernWindow();
+        }
     }
 
     public void ToggleFromCommand()
     {
-        if (!IsOpen || modernCollapsed)
+        if (!IsOpen || configuration.ModernWindowCollapsed)
         {
             OpenAndExpand();
             return;
@@ -568,8 +594,34 @@ public sealed class MainWindow : Window
 
     private void RequestModernCollapse()
     {
-        modernCollapsed = true;
-        ImGui.SetWindowCollapsed("Sentinel Profiles##SentinelProfiles-Main", true);
+        if (configuration.ModernWindowCollapsed)
+        {
+            ExpandModernWindow();
+            return;
+        }
+
+        var scale = ImGuiHelpers.GlobalScale;
+        configuration.ModernExpandedWidth = modernFrameWindowSize.X / scale;
+        configuration.ModernExpandedHeight = modernFrameWindowSize.Y / scale;
+        pendingModernSize = new Vector2(
+            modernFrameWindowSize.X,
+            SentinelModernAppLayoutOptions.Default.HeaderHeight * scale);
+        configuration.ModernWindowCollapsed = true;
+        saveConfiguration();
+    }
+
+    private void ExpandModernWindow()
+    {
+        var scale = ImGuiHelpers.GlobalScale;
+        var minimumWidth = SentinelModernAppLayout.MinimumWindowSize(scale, hasSecondarySidebar: false).X;
+        var currentWidth = modernFrameWindowSize.X > 0f
+            ? modernFrameWindowSize.X
+            : MathF.Max(minimumWidth, configuration.ModernExpandedWidth * scale);
+        pendingModernSize = new Vector2(
+            currentWidth,
+            MathF.Max(ClassicMinimumWindowSize.Y, configuration.ModernExpandedHeight) * scale);
+        configuration.ModernWindowCollapsed = false;
+        saveConfiguration();
     }
 
     private void RequestModernClose() => IsOpen = false;

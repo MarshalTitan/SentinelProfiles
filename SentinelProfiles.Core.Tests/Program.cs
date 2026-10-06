@@ -10,6 +10,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Duplicate is independent and deletion clears last applied", TestDuplicateAndDelete),
     ("Configuration data round-trips and normalizes", TestSerialization),
     ("Schema-one configurations migrate explicitly to Classic", TestThemeMigration),
+    ("Modern minimized window state and expanded size persist", TestModernWindowStatePersistence),
     ("Apply orders disables before enables and leaves unmanaged plugins alone", TestApplyOrdering),
     ("Apply preserves missing entries and continues after failures", TestPartialFailure),
     ("Reapply verifies an already-correct profile", TestReapply),
@@ -154,6 +155,43 @@ static Task TestThemeMigration()
     Assert(data.Theme == 0, "Existing schema-one users should migrate to Classic.");
     Assert(data.SelectedProfileId == profileId, "Migration must preserve the selected profile.");
     Assert(data.LastAppliedProfileId == profileId, "Migration must preserve the last-applied profile.");
+    return Task.CompletedTask;
+}
+
+static Task TestModernWindowStatePersistence()
+{
+    var profileId = Guid.NewGuid();
+    var data = new ProfileConfigurationData
+    {
+        Version = 2,
+        Theme = 1,
+        ModernWindowCollapsed = true,
+        ModernExpandedWidth = 1040f,
+        ModernExpandedHeight = 760f,
+        SelectedProfileId = profileId,
+        LastAppliedProfileId = profileId,
+        Profiles =
+        [
+            new PluginProfile
+            {
+                Id = profileId,
+                Name = "Raid",
+            },
+        ],
+    };
+
+    var json = JsonSerializer.Serialize(data);
+    var restored = JsonSerializer.Deserialize<ProfileConfigurationData>(json)
+                   ?? throw new InvalidOperationException("Deserialization returned null.");
+    _ = new ProfileService(restored, new PluginSafetyPolicy(), () => { });
+
+    Assert(restored.Version == ProfileConfigurationData.CurrentSchemaVersion, "Schema-two data should migrate forward.");
+    Assert(restored.Theme == 1, "Migration must preserve an existing user's selected Modern theme.");
+    Assert(restored.ModernWindowCollapsed, "The custom Modern minimized state should round-trip.");
+    Assert(restored.ModernExpandedWidth == 1040f && restored.ModernExpandedHeight == 760f,
+        "The expanded Modern window dimensions should round-trip.");
+    Assert(restored.SelectedProfileId == profileId && restored.LastAppliedProfileId == profileId,
+        "Window-state migration must preserve profile selection and last-applied state.");
     return Task.CompletedTask;
 }
 
