@@ -35,12 +35,15 @@ profile applied and reports whether its explicitly managed plugins still match.
 - Detects drift only from explicit Enable/Disable rules. Leave Alone never
   contributes to drift.
 - Offers **Classic** and **Sentinel Modern** configuration themes. Modern uses
-  the canonical `MarshalTitan.SentinelCore.UI` 0.2.1 shell, navigation, cards,
-  switches, status chips, styling, and ambient treatment; there is no runtime
-  dependency on another installed Sentinel plugin.
-- Uses Core's corrected non-scrolling header and persistent left navigation
-  rail; profile headings, descriptions, and editor controls stay together in
-  the right content pane at every supported window width.
+  the canonical `MarshalTitan.SentinelCore.UI` 0.3.1 application shell,
+  navigation, glass cards, responsive settings rows, switches, status pills,
+  styling, motion, and ambient treatment; there is no runtime dependency on
+  another installed Sentinel plugin.
+- Sentinel Modern uses one compact custom header, a real-icon primary rail,
+  a scrollable text-only profile sidebar, a continuous unified surface, and
+  right-side profile or appearance content. Navigation never stacks.
+- Follows Dalamud's reduced-motion preference and uses Core's stronger `0.9`
+  procedural ambient treatment without copying shared palette or paint code.
 - Migrates existing schema-one users explicitly to Classic without changing
   saved profiles, the selected profile, the last-applied profile, or window
   placement. Sentinel Modern remains an opt-in presentation choice.
@@ -137,15 +140,17 @@ bin/Release/SentinelProfiles/latest.zip
 - `Services/ApplicationCoordinator.cs` — lifecycle, progress, results, and
   shutdown cancellation.
 - `UI/MainWindow.cs` — profile list, editor, bulk controls, status, and reports.
-- `.packages/SentinelCore/v0.2.1.0/` — exact release packages pinned from
-  SentinelCore tag `v0.2.1.0` / commit `d1c5798b42cc1e542db3786deaf03e449a991cd9`.
+- `.packages/SentinelCore/v0.3.1.0/` — exact release packages pinned from
+  SentinelCore tag `v0.3.1.0` / commit `300703b360a58fb4b73bf7675d31fe8cab4614cd`.
+  The vendored `MarshalTitan.SentinelCore.UI.0.3.1.nupkg` SHA-256 is
+  `e1a9ce4e1ce36042c0fcd53f4c23874d918640be10eef16c21f1cd436c6ba747`.
 - `SentinelProfiles.Core.Tests/` — dependency-free executable core test suite.
 
 ## Project boundaries
 
-This repository owns Sentinel Profiles source, workflows, assets, and release
-packages. The shared `MarshalTitan/Sentinel` repository remains only the central
-Dalamud catalog and receives exactly one `SentinelProfiles` object.
+This repository owns Sentinel Profiles source, workflows, assets, release
+packages, and its authoritative `repo.json`. The central `MarshalTitan/Sentinel`
+catalog is reconciled by the configured `plugin-released` notification workflow.
 
 ## AI development disclosure
 

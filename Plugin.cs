@@ -42,6 +42,7 @@ public sealed class Plugin : IDalamudPlugin
         driftDetector = new DriftDetector(safetyPolicy);
         mainWindow = new MainWindow(
             Configuration,
+            PluginInterface,
             Profiles,
             safetyPolicy,
             discovery,
@@ -193,9 +194,9 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.PrintError("[Sentinel Profiles] Unknown option. Use /sprofiles help.");
     }
 
-    private void ToggleMainWindow() => mainWindow.IsOpen = !mainWindow.IsOpen;
+    private void ToggleMainWindow() => mainWindow.ToggleFromCommand();
 
-    private void OpenMainWindow() => mainWindow.IsOpen = true;
+    private void OpenMainWindow() => mainWindow.OpenAndExpand();
 
     private static string Unquote(string value)
     {

@@ -90,7 +90,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "Pins SentinelCore.UI 0.2.1 and adopts its corrected non-scrolling header and persistent left navigation rail. Classic, saved theme selection, profiles, window identity, and all switching behavior remain unchanged. Manual in-game validation remains required for each installed-plugin collection layout." `
+            --notes "Adopts Sentinel Modern 2 from SentinelCore.UI 0.3.1 with one compact custom header, icon rail, unified surface, responsive settings rows, 0.9 ambient treatment, and reduced-motion support. Classic, saved theme selection, profiles, window identity, commands, and all switching behavior remain unchanged." `
             --prerelease
 
       - name: Verify public release asset

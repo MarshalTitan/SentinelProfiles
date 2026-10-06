@@ -5,6 +5,7 @@ using SentinelProfiles.Models;
 var tests = new (string Name, Func<Task> Run)[]
 {
     ("Blank profiles are sparse and names are case-insensitively unique", TestBlankAndNames),
+    ("Profile collections cover empty, single, multiple, and long-name states", TestProfileCollectionStates),
     ("Capture creates a full snapshot except protected plugins", TestCapture),
     ("Duplicate is independent and deletion clears last applied", TestDuplicateAndDelete),
     ("Configuration data round-trips and normalizes", TestSerialization),
@@ -51,6 +52,27 @@ static Task TestBlankAndNames()
     Assert(!service.TryCreateBlank("raid", out _, out var error), "Case-only duplicate should be rejected.");
     Assert(error.Contains("unique", StringComparison.OrdinalIgnoreCase), "Duplicate error should explain uniqueness.");
     Assert(service.TryRename(raid!, "RAID", out _), "Renaming the same profile with different casing should be allowed.");
+    return Task.CompletedTask;
+}
+
+static Task TestProfileCollectionStates()
+{
+    var data = new ProfileConfigurationData();
+    var service = new ProfileService(data, new PluginSafetyPolicy(), () => { });
+    Assert(service.Profiles.Count == 0 && service.SelectedProfile is null, "A new configuration should expose the empty state.");
+
+    Assert(service.TryCreateBlank("Solo", out var solo, out _), "A single profile should be created.");
+    Assert(service.Profiles.Count == 1 && service.SelectedProfile?.Id == solo!.Id, "The single profile should be selected.");
+
+    var maximumLengthName = new string('P', 64);
+    Assert(service.TryCreateBlank(maximumLengthName, out var longName, out _), "A 64-character profile name should be accepted.");
+    Assert(longName!.Name == maximumLengthName, "A valid long profile name should be preserved exactly.");
+    Assert(service.Profiles.Count == 2 && service.SelectedProfile?.Id == longName.Id, "Multiple profiles should retain stable selection.");
+
+    Assert(
+        !service.TryCreateBlank(new string('X', 65), out _, out var error),
+        "A profile name longer than the supported UI and persistence limit should be rejected.");
+    Assert(error.Contains("64", StringComparison.Ordinal), "The long-name error should report the supported limit.");
     return Task.CompletedTask;
 }
 
