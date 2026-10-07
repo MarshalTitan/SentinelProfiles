@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   publish:
+    if: github.ref == 'refs/heads/main'
     runs-on: windows-latest
 
     steps:
@@ -44,13 +45,9 @@ jobs:
             throw "Version must contain four numeric components: $version"
           }
           $tag = "v$version"
-          $entry = @(Get-Content -LiteralPath 'repo.json' -Raw | ConvertFrom-Json) | Select-Object -First 1
-          if ($entry.InternalName -ne 'SentinelProfiles' -or $entry.AssemblyVersion -ne $version) {
-            throw 'repo.json must contain SentinelProfiles at the project version before release.'
-          }
-          $expectedAsset = "https://github.com/MarshalTitan/SentinelProfiles/releases/download/v$version/SentinelProfiles.zip"
-          if ($entry.DownloadLinkInstall -ne $expectedAsset) {
-            throw "repo.json release URL does not match: $expectedAsset"
+          $entries = @(Get-Content -LiteralPath 'repo.json' -Raw | ConvertFrom-Json)
+          if (@($entries | Where-Object InternalName -eq 'SentinelProfiles').Count -ne 1) {
+            throw 'Root repo.json must contain exactly one SentinelProfiles entry.'
           }
           gh release view $tag --repo '${{ github.repository }}' *> $null
           $releaseExists = $LASTEXITCODE -eq 0
@@ -110,72 +107,10 @@ jobs:
           }
           ./.github/scripts/Validate-Package.ps1 -PackagePath $download -ExpectedVersion '${{ steps.version.outputs.value }}'
 
-      - name: Trigger central Sentinel catalog reconciliation
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:GH_TOKEN)) {
-            throw 'DALAMUD_CATALOG_TOKEN is required to publish Sentinel Profiles to the central Sentinel catalog.'
-          }
-
-          $payload = @{
-            event_type = 'plugin-released'
-            client_payload = @{
-              source_repository = '${{ github.repository }}'
-              source_commit = '${{ github.sha }}'
-              internal_name = 'SentinelProfiles'
-              version = '${{ steps.version.outputs.value }}'
-              tag = '${{ steps.version.outputs.tag }}'
-            }
-          } | ConvertTo-Json -Depth 5
-
-          $payload | gh api `
-            --method POST `
-            'repos/MarshalTitan/Sentinel/dispatches' `
-            --input -
-          if ($LASTEXITCODE -ne 0) {
-            throw 'Failed to dispatch the central Sentinel catalog reconciliation.'
-          }
-
-      - name: Verify public central Sentinel catalog
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          $expectedVersion = '${{ steps.version.outputs.value }}'
-          $expectedAsset = "https://github.com/${{ github.repository }}/releases/download/${{ steps.version.outputs.tag }}/SentinelProfiles.zip"
-
-          for ($attempt = 1; $attempt -le 60; $attempt++) {
-            try {
-              $catalogJson = gh api `
-                -H 'Accept: application/vnd.github.raw+json' `
-                'repos/MarshalTitan/Sentinel/contents/repo.json?ref=main'
-              if ($LASTEXITCODE -ne 0) {
-                throw 'Could not read the public central catalog through the GitHub API.'
-              }
-
-              $catalog = $catalogJson | ConvertFrom-Json
-              $entry = @(
-                foreach ($item in $catalog) {
-                  if ($item.InternalName -eq 'SentinelProfiles') { $item }
-                }
-              )
-              if ($entry.Count -eq 1 `
-                  -and $entry[0].AssemblyVersion -eq $expectedVersion `
-                  -and $entry[0].TestingAssemblyVersion -eq $expectedVersion `
-                  -and $entry[0].DownloadLinkInstall -eq $expectedAsset `
-                  -and $entry[0].DownloadLinkUpdate -eq $expectedAsset `
-                  -and $entry[0].DownloadLinkTesting -eq $expectedAsset) {
-                Write-Host "Verified Sentinel Profiles $expectedVersion in the public central catalog."
-                exit 0
-              }
-            }
-            catch {
-              Write-Host "Central catalog verification attempt $attempt failed: $($_.Exception.Message)"
-            }
-
-            Start-Sleep -Seconds 5
-          }
-
-          throw "The public central Sentinel catalog did not reach Sentinel Profiles $expectedVersion within five minutes."
+      - name: Publish authoritative child manifest and verify central catalog
+        uses: MarshalTitan/Sentinel/.github/actions/distribute@4bbc5ce50837b37c8cfaee5c39a075c4f68858ed
+        with:
+          internal-name: SentinelProfiles
+          version: ${{ steps.version.outputs.value }}
+          tag: ${{ steps.version.outputs.tag }}
+          notification-token: ${{ secrets.DALAMUD_CATALOG_TOKEN }}
