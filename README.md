@@ -70,6 +70,13 @@ existing behavior suite. See [UI validation](docs/UI_VALIDATION.md) for the
 remaining in-game visual, saved-geometry, and input checks. The known temporary
 override/reset-on-restart behavior is a separate issue, unchanged by this repair.
 
+## Resizable profile dialogs (0.2.1.4)
+
+Create, Rename, and Delete open as resizable dialogs. Each starts at a size
+bounded by the current display, and long content remains reachable by scrolling.
+Fields and action buttons use the dialog's current width. The main configuration
+window and saved profile settings are unaffected.
+
 ## Commands
 
 - `/sprofiles` — open or toggle the main window

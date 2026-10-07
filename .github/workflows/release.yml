@@ -87,7 +87,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "Repairs PROFILE ACTIONS reachability and supports configuration windows down to 680 logical pixels wide. Modern and Classic wrap long names and feedback; narrow plugin editors reflow state controls. Uses the shared Core shell and responsive settings rows. Saved window geometry, profile enable/disable semantics, and restart behavior are unchanged. In-game visual and controller checks remain to be confirmed." `
+            --notes "Fixes profile dialog clipping in 0.2.1.3: Create, Rename, and Delete dialogs can be resized and scroll when content exceeds the available display area. Inputs and action buttons use available width. Profile application and restart behavior remain unchanged; in-game visual and controller checks are pending." `
             --prerelease
 
       - name: Verify public release asset
