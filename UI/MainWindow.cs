@@ -440,10 +440,21 @@ public sealed class MainWindow : Window
                 ImGuiHelpers.GlobalScale);
             if (emptyCard.IsVisible)
             {
-                SentinelModernUi.SectionHeader("Get started");
-                ImGui.TextWrapped(
-                    "Use New Profile under Profile actions in the sidebar. Editing a profile never changes live plugins; changes happen only when you apply it.");
-                DrawApplyFeedback(true);
+                var emptyVisible = ImGui.BeginChild("##SentinelProfiles.EmptyScroll", Vector2.Zero);
+                try
+                {
+                    if (emptyVisible)
+                    {
+                        SentinelModernUi.SectionHeader("Get started");
+                        ImGui.TextWrapped(
+                            "Use New Profile under Profile actions in the sidebar. Editing a profile never changes live plugins; changes happen only when you apply it.");
+                        DrawApplyFeedback(true);
+                    }
+                }
+                finally
+                {
+                    ImGui.EndChild();
+                }
             }
 
             return;
@@ -895,7 +906,7 @@ public sealed class MainWindow : Window
 
         var rows = BuildRows(profile);
         selectedPlugins.RemoveWhere(internalName => rows.All(row => !row.InternalName.Equals(internalName, StringComparison.OrdinalIgnoreCase)));
-        DrawBulkControls(profile, rows, modern);
+        DrawBulkControls(profile, rows);
         ImGui.Spacing();
         DrawPluginTable(profile, rows, modern);
     }
@@ -990,8 +1001,7 @@ public sealed class MainWindow : Window
 
     private void DrawBulkControls(
         PluginProfile profile,
-        IReadOnlyList<PluginEditorRow> rows,
-        bool modern)
+        IReadOnlyList<PluginEditorRow> rows)
     {
         ImGui.TextDisabled($"{rows.Count} shown  |  {selectedPlugins.Count} selected");
         ImGui.BeginDisabled(selectedPlugins.Count == 0 || coordinator.IsBusy);
@@ -1213,7 +1223,11 @@ public sealed class MainWindow : Window
         ImGui.SetNextItemWidth(360f * ImGuiHelpers.GlobalScale);
         ImGui.InputText("##new-profile-name", ref modalName, 64);
         if (modalError.Length > 0)
-            ImGui.TextWrapped(modalError);
+        {
+            ImGui.PushTextWrapPos(0f);
+            ImGui.TextColored(Red, modalError);
+            ImGui.PopTextWrapPos();
+        }
 
         ImGui.Spacing();
         ImGui.TextWrapped("Blank Profile starts every installed plugin as literal Leave Alone. This is the normal, focused option.");
@@ -1258,7 +1272,11 @@ public sealed class MainWindow : Window
         ImGui.SetNextItemWidth(360f * ImGuiHelpers.GlobalScale);
         ImGui.InputText("##rename-profile-name", ref modalName, 64);
         if (modalError.Length > 0)
-            ImGui.TextWrapped(modalError);
+        {
+            ImGui.PushTextWrapPos(0f);
+            ImGui.TextColored(Red, modalError);
+            ImGui.PopTextWrapPos();
+        }
 
         if (ImGui.Button("Rename", new Vector2(175f * ImGuiHelpers.GlobalScale, 0)))
         {
