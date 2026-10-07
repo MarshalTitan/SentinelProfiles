@@ -17,7 +17,10 @@ public sealed class MainWindow : Window
     private const string ProfilesPageId = "profiles";
     private const string AppearancePageId = "appearance";
 
-    private static readonly Vector2 ClassicMinimumWindowSize = new(850f, 560f);
+    private static readonly Vector2 ClassicMinimumWindowSize = new(680f, 560f);
+
+    private static readonly SentinelModernAppLayoutOptions ModernLayout =
+        SentinelModernAppLayoutOptions.Default with { SecondarySidebarWidth = ProfilePaneWidth };
 
     private static readonly SentinelModernNavItem[] ModernPrimaryNavigation =
     [
@@ -141,7 +144,7 @@ public sealed class MainWindow : Window
             Flags = SentinelModernWindowChrome.UseCustomHeader(classicWindowFlags);
             modernStyle.PushAppShell(scale);
             var headerHeight = SentinelModernAppLayoutOptions.Default.HeaderHeight * scale;
-            var shellMinimum = SentinelModernAppLayout.MinimumWindowSize(scale, hasSecondarySidebar: true);
+            var shellMinimum = SentinelModernAppLayout.MinimumWindowSize(scale, hasSecondarySidebar: true, options: ModernLayout);
             var collapsedMinimum = SentinelModernAppLayout.MinimumWindowSize(scale, hasSecondarySidebar: false);
             SizeConstraints = new WindowSizeConstraints
             {
@@ -161,7 +164,7 @@ public sealed class MainWindow : Window
         else
         {
             Flags = classicWindowFlags;
-            SizeConstraints = new WindowSizeConstraints { MinimumSize = ClassicMinimumWindowSize };
+            SizeConstraints = new WindowSizeConstraints { MinimumSize = ClassicMinimumWindowSize * ImGuiHelpers.GlobalScale };
         }
 
         if (pendingModernSize is { } requestedSize)
@@ -207,6 +210,7 @@ public sealed class MainWindow : Window
         ImGui.Spacing();
 
         var available = ImGui.GetContentRegionAvail();
+        available.Y = MathF.Max(120f * ImGuiHelpers.GlobalScale, available.Y);
         if (ImGui.BeginChild("ProfilesPane", new Vector2(ProfilePaneWidth * ImGuiHelpers.GlobalScale, available.Y), true))
             DrawProfilesPane();
         ImGui.EndChild();
@@ -231,6 +235,7 @@ public sealed class MainWindow : Window
             ReducedMotion = pluginInterface.UiBuilder.ShouldUseReducedMotion,
             AmbientIntensity = 0.9f,
             SurfaceStyle = SentinelModernAppSurfaceStyle.Unified,
+            Layout = ModernLayout,
             EnableWindowDragging = true,
             ContextLabel = GetModernContextLabel(),
             Status = GetModernStatusPill(),
@@ -268,16 +273,14 @@ public sealed class MainWindow : Window
     private void DrawStatusHeader()
     {
         ImGui.TextColored(Gold, "SENTINEL PROFILES");
-        ImGui.SameLine();
-        ImGui.TextDisabled("Manual plugin configuration switching");
+        ImGui.TextWrapped("Manual plugin configuration switching");
         DrawThemeSelector();
 
         var lastApplied = profiles.LastAppliedProfile;
         var drift = driftDetector.Evaluate(lastApplied, discovery.Snapshot);
-        ImGui.Text("Last Applied:");
-        ImGui.SameLine();
-        ImGui.TextColored(lastApplied is null ? Muted : Gold, lastApplied?.Name ?? "None");
-        ImGui.SameLine();
+        ImGui.PushTextWrapPos(0f);
+        ImGui.TextColored(lastApplied is null ? Muted : Gold, $"Last applied: {lastApplied?.Name ?? "None"}");
+        ImGui.PopTextWrapPos();
         ImGui.Text("Status:");
         ImGui.SameLine();
         switch (drift.State)
@@ -300,7 +303,6 @@ public sealed class MainWindow : Window
                 break;
         }
 
-        ImGui.SameLine();
         ImGui.BeginDisabled(lastApplied is null || coordinator.IsBusy);
         if (ImGui.SmallButton("Reapply Profile"))
             reapplyLastProfile(ApplyOrigin.UserInterface);
@@ -311,6 +313,7 @@ public sealed class MainWindow : Window
 
     private void DrawApplyFeedback(bool modern)
     {
+        ImGui.PushTextWrapPos(0f);
         var progress = coordinator.Progress;
         if (progress is not null)
         {
@@ -323,7 +326,8 @@ public sealed class MainWindow : Window
                 false => $"Disabling {progress.CurrentPlugin}",
                 _ => "Preparing and verifying",
             };
-            ImGui.ProgressBar(fraction, new Vector2(-1, 0), $"Applying {progress.ProfileName}: {action}");
+            ImGui.TextWrapped($"Applying {progress.ProfileName}: {action}");
+            ImGui.ProgressBar(fraction, new Vector2(-1, 0));
             if (modern)
                 ImGui.Spacing();
         }
@@ -334,8 +338,6 @@ public sealed class MainWindow : Window
                 result.Succeeded
                     ? $"{result.ProfileName} applied successfully"
                     : $"{result.ProfileName} applied with {result.Problems.Count} problem(s)");
-            if (!modern)
-                ImGui.SameLine();
             ImGui.TextDisabled(
                 $"{result.Enabled} enabled  |  {result.Disabled} disabled  |  "
                 + $"{result.AlreadyCorrect} already correct  |  {result.LeftAlone} left alone");
@@ -350,11 +352,10 @@ public sealed class MainWindow : Window
                 {
                     foreach (var problem in result.Problems)
                     {
-                        ImGui.BulletText($"{problem.DisplayName}: {problem.Reason}");
+                        ImGui.TextWrapped($"• {problem.DisplayName}: {problem.Reason}");
                         if (configuration.ShowInternalNames
                             && !problem.DisplayName.Equals(problem.InternalName, StringComparison.OrdinalIgnoreCase))
                         {
-                            ImGui.SameLine();
                             ImGui.TextDisabled($"[{problem.InternalName}]");
                         }
                     }
@@ -367,6 +368,7 @@ public sealed class MainWindow : Window
         if (coordinator.FatalError is { } fatalError)
             ImGui.TextColored(Red, fatalError);
 
+        ImGui.PopTextWrapPos();
         if (modern && (progress is not null || coordinator.LastResult is not null || coordinator.FatalError is not null))
         {
             ImGui.Spacing();
@@ -377,57 +379,31 @@ public sealed class MainWindow : Window
 
     private void DrawModernProfileNavigation()
     {
-        var scale = ImGuiHelpers.GlobalScale;
-        SentinelModernSecondaryNavigation.GroupLabel("Profiles");
-        ImGui.Spacing();
-
-        var available = ImGui.GetContentRegionAvail();
-        var actionsReserve = 330f * scale;
-        var profileListHeight = MathF.Max(104f * scale, available.Y - actionsReserve);
-        var visible = ImGui.BeginChild(
-            "##SentinelProfiles.Modern2.ProfileList",
-            new Vector2(0f, profileListHeight));
+        // Core's secondary surface deliberately has no scrolling. Own a normal scrolling
+        // child for the entire profile list and actions so no fixed reserve can hide actions.
+        var visible = ImGui.BeginChild("##SentinelProfiles.Modern2.ProfileNavigation", Vector2.Zero);
         try
         {
-            if (visible)
-            {
-                if (profiles.Profiles.Count == 0)
-                {
-                    ImGui.TextWrapped("No profiles yet. Create a blank profile to begin.");
-                }
-                else
-                {
-                    foreach (var profile in profiles.Profiles)
-                    {
-                        var selected = profiles.SelectedProfile?.Id == profile.Id;
-                        var suffix = profiles.LastAppliedProfile?.Id == profile.Id ? "  • Last" : string.Empty;
-                        if (SentinelModernSecondaryNavigation.Item(
-                                $"SentinelProfiles.Profile.{profile.Id:N}",
-                                profile.Name + suffix,
-                                selected,
-                                modernShellState.Motion,
-                                scale))
-                        {
-                            profiles.Select(profile.Id);
-                            selectedPlugins.Clear();
-                        }
-                    }
-                }
-            }
+            if (!visible)
+                return;
+
+            SentinelModernSecondaryNavigation.GroupLabel("Profiles");
+            ImGui.Spacing();
+            DrawProfileList(true);
+            ImGui.Spacing();
+            ImGui.TextDisabled("Last applied");
+            ImGui.TextWrapped(profiles.LastAppliedProfile?.Name ?? "None");
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+            SentinelModernSecondaryNavigation.GroupLabel("Profile actions");
+            ImGui.Spacing();
+            DrawProfileActions(true);
         }
         finally
         {
             ImGui.EndChild();
         }
-
-        ImGui.TextDisabled("Last applied");
-        ImGui.TextWrapped(profiles.LastAppliedProfile?.Name ?? "None");
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-        SentinelModernSecondaryNavigation.GroupLabel("Profile actions");
-        ImGui.Spacing();
-        DrawProfileActions(true);
     }
 
     private void DrawModernPage()
@@ -464,18 +440,31 @@ public sealed class MainWindow : Window
                 ImGuiHelpers.GlobalScale);
             if (emptyCard.IsVisible)
             {
-                SentinelModernUi.SectionHeader("Get started");
-                ImGui.TextWrapped(
-                    "Use New Profile in the sidebar. Editing a profile never changes live plugins; changes happen only when you apply it.");
-                DrawApplyFeedback(true);
+                var emptyVisible = ImGui.BeginChild("##SentinelProfiles.EmptyScroll", Vector2.Zero);
+                try
+                {
+                    if (emptyVisible)
+                    {
+                        SentinelModernUi.SectionHeader("Get started");
+                        ImGui.TextWrapped(
+                            "Use New Profile under Profile actions in the sidebar. Editing a profile never changes live plugins; changes happen only when you apply it.");
+                        DrawApplyFeedback(true);
+                    }
+                }
+                finally
+                {
+                    ImGui.EndChild();
+                }
             }
 
             return;
         }
 
+        ImGui.PushTextWrapPos(0f);
         SentinelModernUi.PageHeading(
             profile.Name,
             $"{profile.PluginStates.Count} managed rule(s). Editing desired states does not change live plugins.");
+        ImGui.PopTextWrapPos();
         ImGui.Spacing();
         using var editorCard = SentinelModernGlassCard.Begin(
             "SentinelProfiles.Modern2.Editor",
@@ -489,8 +478,19 @@ public sealed class MainWindow : Window
         if (!editorCard.IsVisible)
             return;
 
-        DrawApplyFeedback(true);
-        DrawEditorPane(true);
+        var visible = ImGui.BeginChild("##SentinelProfiles.EditorScroll", Vector2.Zero);
+        try
+        {
+            if (visible)
+            {
+                DrawApplyFeedback(true);
+                DrawEditorPane(true);
+            }
+        }
+        finally
+        {
+            ImGui.EndChild();
+        }
     }
 
     private void DrawModernAppearancePage()
@@ -511,26 +511,41 @@ public sealed class MainWindow : Window
         if (!card.IsVisible)
             return;
 
-        SentinelModernUi.SectionHeader("Theme");
-        SentinelModernSettingsRow.Draw(
-            "SentinelProfiles.Modern2.Theme",
-            "Sentinel Modern 2",
-            "Switch back to the original Classic layout. Profiles and every saved setting are preserved.",
-            drawModernClassicThemeControl,
-            controlWidth: 190f,
-            scale: ImGuiHelpers.GlobalScale);
+        var visible = ImGui.BeginChild("##SentinelProfiles.AppearanceScroll", Vector2.Zero);
+        try
+        {
+            if (!visible)
+                return;
 
-        ImGui.Spacing();
-        var reducedMotion = pluginInterface.UiBuilder.ShouldUseReducedMotion;
-        SentinelModernStatusPill.Draw(
-            new SentinelModernStatusPillOptions(
-                reducedMotion ? "REDUCED MOTION" : "STANDARD MOTION",
-                reducedMotion ? SentinelModernPillTone.Neutral : SentinelModernPillTone.Accent)
-            {
-                Tooltip = "Motion follows Dalamud's accessibility preference.",
-            },
-            modernShellState.Motion,
-            ImGuiHelpers.GlobalScale);
+            SentinelModernUi.SectionHeader("Theme");
+            SentinelModernSettingsRow.Draw(
+                "SentinelProfiles.Modern2.Theme",
+                "Sentinel Modern 2",
+                "Switch back to the original Classic layout. Profiles and every saved setting are preserved.",
+                drawModernClassicThemeControl,
+                layoutOptions: SentinelModernSettingsRowLayoutOptions.Default with
+                {
+                    PreferredControlWidth = 190f,
+                    MinimumControlWidth = 190f,
+                },
+                scale: ImGuiHelpers.GlobalScale);
+
+            ImGui.Spacing();
+            var reducedMotion = pluginInterface.UiBuilder.ShouldUseReducedMotion;
+            SentinelModernStatusPill.Draw(
+                new SentinelModernStatusPillOptions(
+                    reducedMotion ? "REDUCED MOTION" : "STANDARD MOTION",
+                    reducedMotion ? SentinelModernPillTone.Neutral : SentinelModernPillTone.Accent)
+                {
+                    Tooltip = "Motion follows Dalamud's accessibility preference.",
+                },
+                modernShellState.Motion,
+                ImGuiHelpers.GlobalScale);
+        }
+        finally
+        {
+            ImGui.EndChild();
+        }
     }
 
     private SentinelModernStatusPillOptions GetModernStatusPill()
@@ -685,7 +700,7 @@ public sealed class MainWindow : Window
         if (!SentinelModernActionDock.PrimaryButton(
                 "SentinelProfiles.SwitchClassic",
                 "Switch to Classic",
-                new Vector2(-1f, 0f),
+                new Vector2(ImGui.CalcItemWidth(), ImGui.GetFrameHeight()),
                 ImGuiHelpers.GlobalScale))
         {
             return;
@@ -716,34 +731,59 @@ public sealed class MainWindow : Window
     {
         ImGui.TextColored(Gold, "PROFILES");
         ImGui.Separator();
+        DrawProfileList(false);
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.TextColored(Gold, "PROFILE ACTIONS");
+        DrawProfileActions();
+    }
 
+    private void DrawProfileList(bool modern)
+    {
         if (profiles.Profiles.Count == 0)
         {
-            ImGui.Spacing();
-            ImGui.TextWrapped("No profiles yet. Create a Blank Profile to choose only the plugins this profile should manage.");
+            ImGui.TextWrapped("No profiles yet. Create a blank profile to begin.");
+            return;
         }
-        else
+
+        foreach (var profile in profiles.Profiles)
         {
-            foreach (var profile in profiles.Profiles)
+            var selected = profiles.SelectedProfile?.Id == profile.Id;
+            var suffix = profiles.LastAppliedProfile?.Id == profile.Id ? "  • Last" : string.Empty;
+            var label = profile.Name + suffix;
+            var scale = ImGuiHelpers.GlobalScale;
+            var width = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
+            if (modern && ImGui.CalcTextSize(label).X + 24f * scale <= width)
             {
-                var selected = profiles.SelectedProfile?.Id == profile.Id;
-                if (ImGui.Selectable($"{profile.Name}##profile-{profile.Id}", selected))
+                if (SentinelModernSecondaryNavigation.Item(
+                        $"SentinelProfiles.Profile.{profile.Id:N}",
+                        label, selected, modernShellState.Motion, scale))
                 {
                     profiles.Select(profile.Id);
                     selectedPlugins.Clear();
                 }
-
-                if (profiles.LastAppliedProfile?.Id == profile.Id)
-                {
-                    ImGui.SameLine();
-                    ImGui.TextColored(Gold, "Last");
-                }
+                continue;
             }
-        }
 
-        ImGui.Spacing();
-        ImGui.Separator();
-        DrawProfileActions();
+            // Long names retain native selectable activation and scroll-to-focus.
+            var padding = ImGui.GetStyle().FramePadding;
+            var textWidth = MathF.Max(1f, width - 2f * padding.X);
+            var height = MathF.Max(ImGui.GetFrameHeight(),
+                ImGui.CalcTextSize(label, false, textWidth).Y + 2f * padding.Y);
+            var origin = ImGui.GetCursorScreenPos();
+            if (ImGui.Selectable($"##profile-{profile.Id}", selected,
+                    ImGuiSelectableFlags.None, new Vector2(width, height)))
+            {
+                profiles.Select(profile.Id);
+                selectedPlugins.Clear();
+            }
+            var next = ImGui.GetCursorScreenPos();
+            ImGui.SetCursorScreenPos(origin + padding);
+            ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + textWidth);
+            ImGui.TextUnformatted(label);
+            ImGui.PopTextWrapPos();
+            ImGui.SetCursorScreenPos(next);
+        }
     }
 
     private void DrawProfileActions(bool modern = false)
@@ -805,7 +845,7 @@ public sealed class MainWindow : Window
                 new Vector2(-1f, 0f),
                 scale)
             : ImGui.Button(
-                selectedProfile is null ? "Apply Profile" : $"Apply {selectedProfile.Name}",
+                "Apply Selected",
                 new Vector2(-1, 0));
         if (apply && selectedProfile is not null)
         {
@@ -814,7 +854,7 @@ public sealed class MainWindow : Window
         ImGui.EndDisabled();
 
         ImGui.BeginDisabled(profiles.LastAppliedProfile is null || coordinator.IsBusy);
-        if (ImGui.Button("Reapply Last Profile", new Vector2(-1, 0)))
+        if (ImGui.Button("Reapply Last", new Vector2(-1, 0)))
             reapplyLastProfile(ApplyOrigin.UserInterface);
         ImGui.EndDisabled();
     }
@@ -832,10 +872,11 @@ public sealed class MainWindow : Window
 
         if (!modern)
         {
+            ImGui.PushTextWrapPos(0f);
             ImGui.TextColored(Gold, profile.Name.ToUpperInvariant());
-            ImGui.SameLine();
+            ImGui.PopTextWrapPos();
             ImGui.TextDisabled($"{profile.PluginStates.Count} managed rule(s)");
-            ImGui.TextDisabled("Editing desired states does not change live plugins. Apply the profile when ready.");
+            ImGui.TextWrapped("Editing desired states does not change live plugins. Apply the profile when ready.");
         }
 
         if (modern)
@@ -844,19 +885,17 @@ public sealed class MainWindow : Window
         }
         else
         {
-            ImGui.SetNextItemWidth(Math.Max(180f, ImGui.GetContentRegionAvail().X * 0.48f));
+            ImGui.SetNextItemWidth(-1f);
             ImGui.InputTextWithHint("##plugin-search", "Search plugins...", ref search, 128);
-            ImGui.SameLine();
 
             var filterIndex = (int)configuration.EditorFilter;
-            ImGui.SetNextItemWidth(175f * ImGuiHelpers.GlobalScale);
+            ImGui.SetNextItemWidth(-1f);
             if (ImGui.Combo("##plugin-filter", ref filterIndex, FilterLabels, FilterLabels.Length))
             {
                 configuration.EditorFilter = (EditorFilter)filterIndex;
                 saveConfiguration();
             }
 
-            ImGui.SameLine();
             var showInternalNames = configuration.ShowInternalNames;
             if (ImGui.Checkbox("Internal names", ref showInternalNames))
             {
@@ -867,7 +906,7 @@ public sealed class MainWindow : Window
 
         var rows = BuildRows(profile);
         selectedPlugins.RemoveWhere(internalName => rows.All(row => !row.InternalName.Equals(internalName, StringComparison.OrdinalIgnoreCase)));
-        DrawBulkControls(profile, rows, modern);
+        DrawBulkControls(profile, rows);
         ImGui.Spacing();
         DrawPluginTable(profile, rows, modern);
     }
@@ -895,7 +934,7 @@ public sealed class MainWindow : Window
         var showInternalNames = configuration.ShowInternalNames;
         if (SentinelModernSwitch.Draw(
                 "SentinelProfiles.Modern2.InternalNames",
-                "Show internal plugin names",
+                "Internal names",
                 ref showInternalNames,
                 modernShellState.Motion,
                 scale))
@@ -962,26 +1001,25 @@ public sealed class MainWindow : Window
 
     private void DrawBulkControls(
         PluginProfile profile,
-        IReadOnlyList<PluginEditorRow> rows,
-        bool modern)
+        IReadOnlyList<PluginEditorRow> rows)
     {
         ImGui.TextDisabled($"{rows.Count} shown  |  {selectedPlugins.Count} selected");
-        if (!modern)
-            ImGui.SameLine();
         ImGui.BeginDisabled(selectedPlugins.Count == 0 || coordinator.IsBusy);
-        ImGui.Text("Set Selected:");
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Enable##bulk"))
+        ImGui.TextWrapped("Set Selected:");
+        var layout = ProfileEditorLayout.StateButtons(
+            ImGui.GetContentRegionAvail().X,
+            ImGui.CalcTextSize("Leave Alone").X,
+            ImGui.GetStyle().FramePadding.X,
+            ImGui.GetStyle().ItemSpacing.X);
+        if (ImGui.Button("Enable##bulk", new Vector2(layout.ButtonWidth, 0f)))
             SetSelected(profile, rows, ProfilePluginState.Enable);
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Leave Alone##bulk"))
+        if (layout.Inline) ImGui.SameLine();
+        if (ImGui.Button("Leave Alone##bulk", new Vector2(layout.ButtonWidth, 0f)))
             SetSelected(profile, rows, ProfilePluginState.LeaveAlone);
-        ImGui.SameLine();
-        if (ImGui.SmallButton("Disable##bulk"))
+        if (layout.Inline) ImGui.SameLine();
+        if (ImGui.Button("Disable##bulk", new Vector2(layout.ButtonWidth, 0f)))
             SetSelected(profile, rows, ProfilePluginState.Disable);
-        if (!modern || ImGui.GetContentRegionAvail().X >= 122f * ImGuiHelpers.GlobalScale)
-            ImGui.SameLine();
-        if (ImGui.SmallButton("Clear Selection"))
+        if (ImGui.Button("Clear Selection", new Vector2(-1f, 0f)))
             selectedPlugins.Clear();
         ImGui.EndDisabled();
     }
@@ -1007,18 +1045,31 @@ public sealed class MainWindow : Window
         var flags = ImGuiTableFlags.RowBg
                     | ImGuiTableFlags.BordersInnerH
                     | ImGuiTableFlags.BordersInnerV
-                    | ImGuiTableFlags.Resizable
                     | ImGuiTableFlags.ScrollY
                     | ImGuiTableFlags.SizingStretchProp;
 
-        if (!ImGui.BeginTable("PluginProfileEditor", 4, flags, new Vector2(0, -1)))
+        var scale = ImGuiHelpers.GlobalScale;
+        var style = ImGui.GetStyle();
+        var stateWidth = 3f * (ImGui.CalcTextSize("Leave Alone").X + 2f * style.FramePadding.X)
+                         + 2f * style.ItemSpacing.X;
+        var currentWidth = MathF.Max(130f * scale, ImGui.CalcTextSize("Current State").X + 18f * scale);
+        var selectionWidth = ImGui.GetFrameHeight();
+        var compact = ImGui.GetContentRegionAvail().X
+            < selectionWidth + currentWidth + stateWidth + 180f * scale + 8f * style.CellPadding.X;
+        // Keep a usable table viewport even when wrapped controls consume the card's height.
+        // The containing editor child scrolls normally to make the table reachable.
+        var tableHeight = MathF.Max(160f * scale, ImGui.GetContentRegionAvail().Y - 1f);
+        if (!ImGui.BeginTable("PluginProfileEditor", compact ? 2 : 4, flags, new Vector2(0, tableHeight)))
             return;
 
         ImGui.TableSetupScrollFreeze(0, 1);
-        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 30f * ImGuiHelpers.GlobalScale);
-        ImGui.TableSetupColumn("Plugin", ImGuiTableColumnFlags.WidthStretch, 0.44f);
-        ImGui.TableSetupColumn("Current State", ImGuiTableColumnFlags.WidthFixed, 130f * ImGuiHelpers.GlobalScale);
-        ImGui.TableSetupColumn("Profile State", ImGuiTableColumnFlags.WidthStretch, 0.56f);
+        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, selectionWidth);
+        ImGui.TableSetupColumn("Plugin", ImGuiTableColumnFlags.WidthStretch);
+        if (!compact)
+        {
+            ImGui.TableSetupColumn("Current State", ImGuiTableColumnFlags.WidthFixed, currentWidth);
+            ImGui.TableSetupColumn("Profile State", ImGuiTableColumnFlags.WidthFixed, stateWidth);
+        }
         ImGui.TableHeadersRow();
 
         foreach (var row in rows)
@@ -1044,11 +1095,13 @@ public sealed class MainWindow : Window
             }
 
             ImGui.TableSetColumnIndex(1);
-            ImGui.TextUnformatted(row.DisplayName);
+            ImGui.TextWrapped(row.DisplayName);
             if (configuration.ShowInternalNames
                 && !row.DisplayName.Equals(row.InternalName, StringComparison.OrdinalIgnoreCase))
             {
+                ImGui.PushTextWrapPos(0f);
                 ImGui.TextDisabled(row.InternalName);
+                ImGui.PopTextWrapPos();
             }
 
             if (row.IsProtected)
@@ -1062,7 +1115,10 @@ public sealed class MainWindow : Window
             else if (row.Plugin is null)
                 DrawStatusValue("Missing / Not Installed", SentinelModernStatusTone.Warning, Orange, modern);
 
-            ImGui.TableSetColumnIndex(2);
+            if (!compact)
+                ImGui.TableSetColumnIndex(2);
+            else
+                ImGui.TextDisabled("Current state");
             if (row.Plugin is null)
                 DrawStatusValue("Missing", SentinelModernStatusTone.Warning, Orange, modern);
             else if (row.Plugin.IsLoaded)
@@ -1070,7 +1126,10 @@ public sealed class MainWindow : Window
             else
                 DrawStatusValue("Disabled", SentinelModernStatusTone.Neutral, Muted, modern);
 
-            ImGui.TableSetColumnIndex(3);
+            if (!compact)
+                ImGui.TableSetColumnIndex(3);
+            else
+                ImGui.TextDisabled("Profile state");
             if (row.IsProtected)
             {
                 DrawStatusValue(
@@ -1098,24 +1157,33 @@ public sealed class MainWindow : Window
         Vector4 classicColour,
         bool modern)
     {
-        if (modern)
-            SentinelModernUi.StatusChip(text, modernTone, ImGuiHelpers.GlobalScale);
+        var scale = ImGuiHelpers.GlobalScale;
+        if (modern && ImGui.CalcTextSize(text).X + 18f * scale <= ImGui.GetContentRegionAvail().X)
+            SentinelModernUi.StatusChip(text, modernTone, scale);
         else
-            ImGui.TextColored(classicColour, text);
+        {
+            ImGui.PushStyleColor(ImGuiCol.Text,
+                modern ? SentinelModernPalette.ForStatus(modernTone) : classicColour);
+            ImGui.TextWrapped(text);
+            ImGui.PopStyleColor();
+        }
     }
 
     private void DrawStateSelector(PluginProfile profile, PluginEditorRow row)
     {
-        var availableWidth = ImGui.GetContentRegionAvail().X;
-        var spacing = ImGui.GetStyle().ItemSpacing.X;
-        var buttonWidth = Math.Max(64f, (availableWidth - (spacing * 2)) / 3f);
+        var layout = ProfileEditorLayout.StateButtons(
+            ImGui.GetContentRegionAvail().X,
+            ImGui.CalcTextSize("Leave Alone").X,
+            ImGui.GetStyle().FramePadding.X,
+            ImGui.GetStyle().ItemSpacing.X);
+        var buttonWidth = layout.ButtonWidth;
 
         if (DrawStateButton("Enable", row.State == ProfilePluginState.Enable, EnableButton, buttonWidth))
             profiles.SetPluginState(profile, row.InternalName, row.DisplayName, ProfilePluginState.Enable);
-        ImGui.SameLine();
+        if (layout.Inline) ImGui.SameLine();
         if (DrawStateButton("Leave Alone", row.State == ProfilePluginState.LeaveAlone, LeaveButton, buttonWidth))
             profiles.SetPluginState(profile, row.InternalName, row.DisplayName, ProfilePluginState.LeaveAlone);
-        ImGui.SameLine();
+        if (layout.Inline) ImGui.SameLine();
         if (DrawStateButton("Disable", row.State == ProfilePluginState.Disable, DisableButton, buttonWidth))
             profiles.SetPluginState(profile, row.InternalName, row.DisplayName, ProfilePluginState.Disable);
     }
@@ -1140,6 +1208,9 @@ public sealed class MainWindow : Window
         if (!newModalOpen)
             return;
 
+        ImGui.SetNextWindowSizeConstraints(
+            new Vector2(420f * ImGuiHelpers.GlobalScale, 0f),
+            new Vector2(420f * ImGuiHelpers.GlobalScale, float.MaxValue));
         if (!ImGui.BeginPopupModal(
                 "Create Profile##SentinelProfiles",
                 ref newModalOpen,
@@ -1152,7 +1223,11 @@ public sealed class MainWindow : Window
         ImGui.SetNextItemWidth(360f * ImGuiHelpers.GlobalScale);
         ImGui.InputText("##new-profile-name", ref modalName, 64);
         if (modalError.Length > 0)
+        {
+            ImGui.PushTextWrapPos(0f);
             ImGui.TextColored(Red, modalError);
+            ImGui.PopTextWrapPos();
+        }
 
         ImGui.Spacing();
         ImGui.TextWrapped("Blank Profile starts every installed plugin as literal Leave Alone. This is the normal, focused option.");
@@ -1182,6 +1257,9 @@ public sealed class MainWindow : Window
         if (!renameModalOpen)
             return;
 
+        ImGui.SetNextWindowSizeConstraints(
+            new Vector2(420f * ImGuiHelpers.GlobalScale, 0f),
+            new Vector2(420f * ImGuiHelpers.GlobalScale, float.MaxValue));
         if (!ImGui.BeginPopupModal(
                 "Rename Profile##SentinelProfiles",
                 ref renameModalOpen,
@@ -1194,7 +1272,11 @@ public sealed class MainWindow : Window
         ImGui.SetNextItemWidth(360f * ImGuiHelpers.GlobalScale);
         ImGui.InputText("##rename-profile-name", ref modalName, 64);
         if (modalError.Length > 0)
+        {
+            ImGui.PushTextWrapPos(0f);
             ImGui.TextColored(Red, modalError);
+            ImGui.PopTextWrapPos();
+        }
 
         if (ImGui.Button("Rename", new Vector2(175f * ImGuiHelpers.GlobalScale, 0)))
         {
@@ -1215,6 +1297,9 @@ public sealed class MainWindow : Window
         if (!deleteModalOpen)
             return;
 
+        ImGui.SetNextWindowSizeConstraints(
+            new Vector2(420f * ImGuiHelpers.GlobalScale, 0f),
+            new Vector2(420f * ImGuiHelpers.GlobalScale, float.MaxValue));
         if (!ImGui.BeginPopupModal(
                 "Delete Profile##SentinelProfiles",
                 ref deleteModalOpen,
