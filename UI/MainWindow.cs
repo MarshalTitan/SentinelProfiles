@@ -14,6 +14,8 @@ namespace SentinelProfiles.UI;
 public sealed class MainWindow : Window
 {
     private const float ProfilePaneWidth = 235f;
+    private const float CompactStateButtonPadding = 4f;
+    private const float CompactStateButtonSpacing = 4f;
     private const string ProfilesPageId = "profiles";
     private const string AppearancePageId = "appearance";
 
@@ -1006,19 +1008,17 @@ public sealed class MainWindow : Window
         ImGui.TextDisabled($"{rows.Count} shown  |  {selectedPlugins.Count} selected");
         ImGui.BeginDisabled(selectedPlugins.Count == 0 || coordinator.IsBusy);
         ImGui.TextWrapped("Set Selected:");
-        var layout = ProfileEditorLayout.StateButtons(
-            ImGui.GetContentRegionAvail().X,
-            ImGui.CalcTextSize("Leave Alone").X,
-            ImGui.GetStyle().FramePadding.X,
-            ImGui.GetStyle().ItemSpacing.X);
-        if (ImGui.Button("Enable##bulk", new Vector2(layout.ButtonWidth, 0f)))
+        PushCompactStateButtonStyle();
+        var layout = MeasureStateButtons(ImGui.GetContentRegionAvail().X);
+        if (ImGui.Button("Enable##bulk", new Vector2(layout.EnableWidth, 0f)))
             SetSelected(profile, rows, ProfilePluginState.Enable);
         if (layout.Inline) ImGui.SameLine();
-        if (ImGui.Button("Leave Alone##bulk", new Vector2(layout.ButtonWidth, 0f)))
+        if (ImGui.Button("Leave Alone##bulk", new Vector2(layout.LeaveAloneWidth, 0f)))
             SetSelected(profile, rows, ProfilePluginState.LeaveAlone);
         if (layout.Inline) ImGui.SameLine();
-        if (ImGui.Button("Disable##bulk", new Vector2(layout.ButtonWidth, 0f)))
+        if (ImGui.Button("Disable##bulk", new Vector2(layout.DisableWidth, 0f)))
             SetSelected(profile, rows, ProfilePluginState.Disable);
+        ImGui.PopStyleVar(2);
         if (ImGui.Button("Clear Selection", new Vector2(-1f, 0f)))
             selectedPlugins.Clear();
         ImGui.EndDisabled();
@@ -1050,8 +1050,13 @@ public sealed class MainWindow : Window
 
         var scale = ImGuiHelpers.GlobalScale;
         var style = ImGui.GetStyle();
-        var stateWidth = 3f * (ImGui.CalcTextSize("Leave Alone").X + 2f * style.FramePadding.X)
-                         + 2f * style.ItemSpacing.X;
+        var stateWidth = ProfileEditorLayout.MinimumInlineWidth(
+                             ImGui.CalcTextSize("Enable").X,
+                             ImGui.CalcTextSize("Leave Alone").X,
+                             ImGui.CalcTextSize("Disable").X,
+                             CompactStateButtonPadding * scale,
+                             CompactStateButtonSpacing * scale)
+                         + 2f * style.CellPadding.X + 2f * scale;
         var currentWidth = MathF.Max(130f * scale, ImGui.CalcTextSize("Current State").X + 18f * scale);
         var selectionWidth = ImGui.GetFrameHeight();
         var compact = ImGui.GetContentRegionAvail().X
@@ -1171,21 +1176,41 @@ public sealed class MainWindow : Window
 
     private void DrawStateSelector(PluginProfile profile, PluginEditorRow row)
     {
-        var layout = ProfileEditorLayout.StateButtons(
-            ImGui.GetContentRegionAvail().X,
-            ImGui.CalcTextSize("Leave Alone").X,
-            ImGui.GetStyle().FramePadding.X,
-            ImGui.GetStyle().ItemSpacing.X);
-        var buttonWidth = layout.ButtonWidth;
+        PushCompactStateButtonStyle();
+        var layout = MeasureStateButtons(ImGui.GetContentRegionAvail().X);
 
-        if (DrawStateButton("Enable", row.State == ProfilePluginState.Enable, EnableButton, buttonWidth))
+        if (DrawStateButton("Enable", row.State == ProfilePluginState.Enable, EnableButton, layout.EnableWidth))
             profiles.SetPluginState(profile, row.InternalName, row.DisplayName, ProfilePluginState.Enable);
         if (layout.Inline) ImGui.SameLine();
-        if (DrawStateButton("Leave Alone", row.State == ProfilePluginState.LeaveAlone, LeaveButton, buttonWidth))
+        if (DrawStateButton("Leave Alone", row.State == ProfilePluginState.LeaveAlone, LeaveButton, layout.LeaveAloneWidth))
             profiles.SetPluginState(profile, row.InternalName, row.DisplayName, ProfilePluginState.LeaveAlone);
         if (layout.Inline) ImGui.SameLine();
-        if (DrawStateButton("Disable", row.State == ProfilePluginState.Disable, DisableButton, buttonWidth))
+        if (DrawStateButton("Disable", row.State == ProfilePluginState.Disable, DisableButton, layout.DisableWidth))
             profiles.SetPluginState(profile, row.InternalName, row.DisplayName, ProfilePluginState.Disable);
+        ImGui.PopStyleVar(2);
+    }
+
+    private static (bool Inline, float EnableWidth, float LeaveAloneWidth, float DisableWidth)
+        MeasureStateButtons(float availableWidth)
+    {
+        var style = ImGui.GetStyle();
+        return ProfileEditorLayout.StateButtons(
+            availableWidth,
+            ImGui.CalcTextSize("Enable").X,
+            ImGui.CalcTextSize("Leave Alone").X,
+            ImGui.CalcTextSize("Disable").X,
+            style.FramePadding.X,
+            style.ItemSpacing.X);
+    }
+
+    private static void PushCompactStateButtonStyle()
+    {
+        var style = ImGui.GetStyle();
+        var scale = ImGuiHelpers.GlobalScale;
+        ImGui.PushStyleVar(ImGuiStyleVar.FramePadding,
+            new Vector2(CompactStateButtonPadding * scale, style.FramePadding.Y));
+        ImGui.PushStyleVar(ImGuiStyleVar.ItemSpacing,
+            new Vector2(CompactStateButtonSpacing * scale, style.ItemSpacing.Y));
     }
 
     private static bool DrawStateButton(string label, bool selected, Vector4 color, float width)

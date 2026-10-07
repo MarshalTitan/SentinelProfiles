@@ -87,7 +87,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "Adds a small inset to Create, Rename, and Delete profile popups so content has visible breathing room in Sentinel Modern and Classic. Popup resizing and scrolling remain available. Profile rules and restart semantics are unchanged; in-game confirmation is pending." `
+            --notes "Keeps Enable, Leave Alone, and Disable beside each other in the Profile State column at supported window widths, reducing plugin list scrolling in Sentinel Modern and Classic. Labels remain readable, and extra-narrow layouts still reflow. Profile rules and restart semantics are unchanged; in-game confirmation is pending." `
             --prerelease
 
       - name: Verify public release asset
