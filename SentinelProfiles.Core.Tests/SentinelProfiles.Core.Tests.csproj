@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="../UI/ProfileEditorLayout.cs" Link="UI/ProfileEditorLayout.cs" />
     <Compile Include="../Core/*.cs" Link="Core/%(Filename)%(Extension)" />
     <Compile Include="../Models/*.cs" Link="Models/%(Filename)%(Extension)" />
     <Compile Remove="../Core/PluginApplicationCoordinator.cs" />

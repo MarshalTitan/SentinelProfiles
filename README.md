@@ -51,6 +51,25 @@ profile applied and reports whether its explicitly managed plugins still match.
   policy is centralized so more protected InternalNames can be added later.
 - Never edits another plugin's settings.
 
+## Responsive configuration UI (0.2.1.3)
+
+Both themes support a 680 × 560 logical-pixel minimum, scaled by Dalamud's UI
+scale. Profile actions and editor content scroll vertically; long names and
+feedback wrap. Narrow plugin tables combine details into one column and stack
+the three state buttons when their measured labels do not fit side by side.
+Existing window identity, saved position/size, minimize/restore state, profile
+rules, and native temporary switching commands are preserved.
+
+Core UI inspection: all UI C# source blobs in published tags `v0.4.0.0` and
+`v0.4.1.0` match `v0.3.1.0`. This repair therefore reuses the pinned shared UI
+package without pulling in unrelated navigation foundations. No local shell,
+palette, card, or settings-row renderer was added.
+
+Automated checks cover state-control fit at multiple scales and fonts plus the
+existing behavior suite. See [UI validation](docs/UI_VALIDATION.md) for the
+remaining in-game visual, saved-geometry, and input checks. The known temporary
+override/reset-on-restart behavior is a separate issue, unchanged by this repair.
+
 ## Commands
 
 - `/sprofiles` — open or toggle the main window

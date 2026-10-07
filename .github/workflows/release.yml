@@ -87,7 +87,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "Fixes Sentinel Modern minimize/restore by keeping the shared themed header visible, matching S Rank Sentinel. The minimized state and prior expanded size persist across restarts; Classic, profiles, window position, commands, and plugin switching behavior remain unchanged." `
+            --notes "Repairs PROFILE ACTIONS reachability and supports configuration windows down to 680 logical pixels wide. Modern and Classic wrap long names and feedback; narrow plugin editors reflow state controls. Uses the shared Core shell and responsive settings rows. Saved window geometry, profile enable/disable semantics, and restart behavior are unchanged. In-game visual and controller checks remain to be confirmed." `
             --prerelease
 
       - name: Verify public release asset
