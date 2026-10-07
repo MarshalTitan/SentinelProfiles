@@ -1,6 +1,6 @@
 # Profiles UI repair validation
 
-Version: 0.2.1.5. Scope: presentation only.
+Version: 0.2.1.6. Scope: presentation only.
 
 ## Automated
 
@@ -8,7 +8,8 @@ Version: 0.2.1.5. Scope: presentation only.
   minimized-window persistence tests remain enabled.
 - State-control fit tests use the 680px Modern minimum width budget, wider
   widths, 100/125/150/200% UI scale, and independent 85/100/120% font metrics.
-- Boundary checks require stacking below the measured fit width.
+- The three Profile State controls remain inline at the supported minimum width.
+- Boundary checks require stacking only below the measured intrinsic fit width.
 - CI builds against Dalamud API 15 and validates the installable ZIP.
 - No changes to Models, Core, Services, Configuration.cs, or Plugin.cs.
 
@@ -20,7 +21,7 @@ At 680 × 560 and 1080 × 720 logical pixels, in both themes and at 100/150/200%
    Profile Action; create, duplicate, rename, delete, apply, and reapply are
    reachable with their existing busy/protection rules.
 2. Long plugin display/internal names, missing and protected rows: labels wrap;
-   current state remains distinct from profile state. All three state buttons,
+   current state remains distinct from profile state. All three inline state buttons,
    row selection, search/filter, and bulk controls remain reachable.
 3. Long apply feedback and problem lists: reach the plugin table by scrolling.
 4. Appearance: reach and activate Switch to Classic at minimum width.
