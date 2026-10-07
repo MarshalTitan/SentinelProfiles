@@ -77,6 +77,12 @@ bounded by the current display, and long content remains reachable by scrolling.
 Fields and action buttons use the dialog's current width. The main configuration
 window and saved profile settings are unaffected.
 
+## Profile dialog spacing (0.2.1.5)
+
+The Create, Rename, and Delete dialogs use a small internal inset in both
+themes. Their fields, descriptions, and buttons remain aligned while the
+dialogs are resized or scrolled.
+
 ## Commands
 
 - `/sprofiles` — open or toggle the main window

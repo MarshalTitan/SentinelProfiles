@@ -1,6 +1,6 @@
 # Profiles UI repair validation
 
-Version: 0.2.1.4. Scope: presentation only.
+Version: 0.2.1.5. Scope: presentation only.
 
 ## Automated
 
@@ -28,7 +28,8 @@ At 680 × 560 and 1080 × 720 logical pixels, in both themes and at 100/150/200%
    search/filter, selection, state controls, and modal buttons; scrolling follows
    focus. Resize all three create/rename/delete modals, scroll each at minimum
    height, and check that fields, action buttons, and Cancel remain reachable
-   at 100/150/200% UI scale, including a small display.
+   at 100/150/200% UI scale, including a small display. Confirm content has
+   a visible left and right inset in both Classic and Modern themes.
 6. Move and resize, close/reopen, switch theme, minimize/expand, reload plugin,
    and restart: saved geometry remains intact. Existing restart switching
    semantics are expected to remain unchanged, not to be repaired here.
