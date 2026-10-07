@@ -83,7 +83,15 @@ The Create, Rename, and Delete dialogs use a small internal inset in both
 themes. Their fields, descriptions, and buttons remain aligned while the
 dialogs are resized or scrolled.
 
-## Compact Profile State buttons (0.2.1.6)\n\nThe three Profile State choices sit beside each other at the supported minimum\nwindow width, keeping plugin rows short. Button widths follow each label's\nmeasured text and use compact spacing. At still narrower transient widths,\nthey stack to keep every choice reachable. Bulk state choices use the same\nfit rule.\n\n## Commands
+## Compact Profile State buttons (0.2.1.6)
+
+The three Profile State choices sit beside each other at the supported minimum
+window width, keeping plugin rows short. Button widths follow each label's
+measured text and use compact spacing. At still narrower transient widths,
+they stack to keep every choice reachable. Bulk state choices use the same
+fit rule.
+
+## Commands
 
 - `/sprofiles` — open or toggle the main window
 - `/sprofiles apply <profile name>` — apply a profile (quotes are optional)
