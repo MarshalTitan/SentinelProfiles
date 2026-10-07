@@ -1208,19 +1208,17 @@ public sealed class MainWindow : Window
         if (!newModalOpen)
             return;
 
-        ImGui.SetNextWindowSizeConstraints(
-            new Vector2(420f * ImGuiHelpers.GlobalScale, 0f),
-            new Vector2(420f * ImGuiHelpers.GlobalScale, float.MaxValue));
+        PrepareProfileModal(420f);
         if (!ImGui.BeginPopupModal(
                 "Create Profile##SentinelProfiles",
                 ref newModalOpen,
-                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoSavedSettings))
+                ImGuiWindowFlags.NoSavedSettings))
         {
             return;
         }
 
         ImGui.Text("Profile name");
-        ImGui.SetNextItemWidth(360f * ImGuiHelpers.GlobalScale);
+        ImGui.SetNextItemWidth(-1f);
         ImGui.InputText("##new-profile-name", ref modalName, 64);
         if (modalError.Length > 0)
         {
@@ -1238,7 +1236,9 @@ public sealed class MainWindow : Window
         }
 
         ImGui.Spacing();
+        ImGui.PushTextWrapPos(0f);
         ImGui.TextColored(Orange, "Capture Current Setup is aggressive.");
+        ImGui.PopTextWrapPos();
         ImGui.TextWrapped("It records every currently enabled plugin as Enable and every currently disabled plugin as Disable.");
         if (ImGui.Button("Capture Current Setup", new Vector2(-1, 0)))
         {
@@ -1257,19 +1257,17 @@ public sealed class MainWindow : Window
         if (!renameModalOpen)
             return;
 
-        ImGui.SetNextWindowSizeConstraints(
-            new Vector2(420f * ImGuiHelpers.GlobalScale, 0f),
-            new Vector2(420f * ImGuiHelpers.GlobalScale, float.MaxValue));
+        PrepareProfileModal(220f);
         if (!ImGui.BeginPopupModal(
                 "Rename Profile##SentinelProfiles",
                 ref renameModalOpen,
-                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoSavedSettings))
+                ImGuiWindowFlags.NoSavedSettings))
         {
             return;
         }
 
         ImGui.Text("New profile name");
-        ImGui.SetNextItemWidth(360f * ImGuiHelpers.GlobalScale);
+        ImGui.SetNextItemWidth(-1f);
         ImGui.InputText("##rename-profile-name", ref modalName, 64);
         if (modalError.Length > 0)
         {
@@ -1278,15 +1276,14 @@ public sealed class MainWindow : Window
             ImGui.PopTextWrapPos();
         }
 
-        if (ImGui.Button("Rename", new Vector2(175f * ImGuiHelpers.GlobalScale, 0)))
+        if (ImGui.Button("Rename", new Vector2(-1f, 0f)))
         {
             var profile = profiles.SelectedProfile;
             if (profile is not null && profiles.TryRename(profile, modalName, out modalError))
                 CloseCurrentModal(ref renameModalOpen);
         }
 
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(175f * ImGuiHelpers.GlobalScale, 0)))
+        if (ImGui.Button("Cancel", new Vector2(-1f, 0f)))
             CloseCurrentModal(ref renameModalOpen);
 
         ImGui.EndPopup();
@@ -1297,13 +1294,11 @@ public sealed class MainWindow : Window
         if (!deleteModalOpen)
             return;
 
-        ImGui.SetNextWindowSizeConstraints(
-            new Vector2(420f * ImGuiHelpers.GlobalScale, 0f),
-            new Vector2(420f * ImGuiHelpers.GlobalScale, float.MaxValue));
+        PrepareProfileModal(240f);
         if (!ImGui.BeginPopupModal(
                 "Delete Profile##SentinelProfiles",
                 ref deleteModalOpen,
-                ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoSavedSettings))
+                ImGuiWindowFlags.NoSavedSettings))
         {
             return;
         }
@@ -1314,7 +1309,7 @@ public sealed class MainWindow : Window
             : $"Delete '{profile.Name}'? This removes the saved profile but does not change any live plugin states.");
 
         ImGui.BeginDisabled(profile is null);
-        if (ImGui.Button("Delete", new Vector2(150f * ImGuiHelpers.GlobalScale, 0)) && profile is not null)
+        if (ImGui.Button("Delete", new Vector2(-1f, 0f)) && profile is not null)
         {
             profiles.Delete(profile);
             selectedPlugins.Clear();
@@ -1322,11 +1317,25 @@ public sealed class MainWindow : Window
         }
         ImGui.EndDisabled();
 
-        ImGui.SameLine();
-        if (ImGui.Button("Cancel", new Vector2(150f * ImGuiHelpers.GlobalScale, 0)))
+        if (ImGui.Button("Cancel", new Vector2(-1f, 0f)))
             CloseCurrentModal(ref deleteModalOpen);
 
         ImGui.EndPopup();
+    }
+
+    private static void PrepareProfileModal(float preferredHeight)
+    {
+        // A constrained initial size keeps every popup on screen at high UI scales.
+        // Native ImGui resizing and scrolling remain available while it is open.
+        var scale = ImGuiHelpers.GlobalScale;
+        var display = ImGui.GetIO().DisplaySize;
+        var maximum = new Vector2(
+            MathF.Max(240f, display.X - 32f * scale),
+            MathF.Max(180f, display.Y - 32f * scale));
+        var minimum = Vector2.Min(new Vector2(340f, 190f) * scale, maximum);
+        var initial = Vector2.Min(new Vector2(480f, preferredHeight) * scale, maximum);
+        ImGui.SetNextWindowSizeConstraints(minimum, maximum);
+        ImGui.SetNextWindowSize(initial, ImGuiCond.Appearing);
     }
 
     private static void CloseCurrentModal(ref bool open)
