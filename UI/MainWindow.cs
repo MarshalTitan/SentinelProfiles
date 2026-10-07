@@ -1208,14 +1208,8 @@ public sealed class MainWindow : Window
         if (!newModalOpen)
             return;
 
-        PrepareProfileModal(420f);
-        if (!ImGui.BeginPopupModal(
-                "Create Profile##SentinelProfiles",
-                ref newModalOpen,
-                ImGuiWindowFlags.NoSavedSettings))
-        {
+        if (!BeginProfileModal("Create Profile##SentinelProfiles", ref newModalOpen, 420f))
             return;
-        }
 
         ImGui.Text("Profile name");
         ImGui.SetNextItemWidth(-1f);
@@ -1249,7 +1243,7 @@ public sealed class MainWindow : Window
         if (ImGui.Button("Cancel", new Vector2(-1, 0)))
             CloseCurrentModal(ref newModalOpen);
 
-        ImGui.EndPopup();
+        EndProfileModal();
     }
 
     private void DrawRenameModal()
@@ -1257,14 +1251,8 @@ public sealed class MainWindow : Window
         if (!renameModalOpen)
             return;
 
-        PrepareProfileModal(220f);
-        if (!ImGui.BeginPopupModal(
-                "Rename Profile##SentinelProfiles",
-                ref renameModalOpen,
-                ImGuiWindowFlags.NoSavedSettings))
-        {
+        if (!BeginProfileModal("Rename Profile##SentinelProfiles", ref renameModalOpen, 220f))
             return;
-        }
 
         ImGui.Text("New profile name");
         ImGui.SetNextItemWidth(-1f);
@@ -1286,7 +1274,7 @@ public sealed class MainWindow : Window
         if (ImGui.Button("Cancel", new Vector2(-1f, 0f)))
             CloseCurrentModal(ref renameModalOpen);
 
-        ImGui.EndPopup();
+        EndProfileModal();
     }
 
     private void DrawDeleteModal()
@@ -1294,14 +1282,8 @@ public sealed class MainWindow : Window
         if (!deleteModalOpen)
             return;
 
-        PrepareProfileModal(240f);
-        if (!ImGui.BeginPopupModal(
-                "Delete Profile##SentinelProfiles",
-                ref deleteModalOpen,
-                ImGuiWindowFlags.NoSavedSettings))
-        {
+        if (!BeginProfileModal("Delete Profile##SentinelProfiles", ref deleteModalOpen, 240f))
             return;
-        }
 
         var profile = profiles.SelectedProfile;
         ImGui.TextWrapped(profile is null
@@ -1320,7 +1302,27 @@ public sealed class MainWindow : Window
         if (ImGui.Button("Cancel", new Vector2(-1f, 0f)))
             CloseCurrentModal(ref deleteModalOpen);
 
+        EndProfileModal();
+    }
+
+    private static bool BeginProfileModal(string name, ref bool open, float preferredHeight)
+    {
+        PrepareProfileModal(preferredHeight);
+        // The shared Modern app shell uses zero window padding for its full-bleed surface.
+        // Popups need their own inset so labels and buttons do not touch the left edge.
+        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding,
+            new Vector2(14f, 10f) * ImGuiHelpers.GlobalScale);
+        if (ImGui.BeginPopupModal(name, ref open, ImGuiWindowFlags.NoSavedSettings))
+            return true;
+
+        ImGui.PopStyleVar();
+        return false;
+    }
+
+    private static void EndProfileModal()
+    {
         ImGui.EndPopup();
+        ImGui.PopStyleVar();
     }
 
     private static void PrepareProfileModal(float preferredHeight)

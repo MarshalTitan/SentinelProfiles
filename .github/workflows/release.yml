@@ -87,7 +87,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "Fixes profile dialog clipping in 0.2.1.3: Create, Rename, and Delete dialogs can be resized and scroll when content exceeds the available display area. Inputs and action buttons use available width. Profile application and restart behavior remain unchanged; in-game visual and controller checks are pending." `
+            --notes "Adds a small inset to Create, Rename, and Delete profile popups so content has visible breathing room in Sentinel Modern and Classic. Popup resizing and scrolling remain available. Profile rules and restart semantics are unchanged; in-game confirmation is pending." `
             --prerelease
 
       - name: Verify public release asset
