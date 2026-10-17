@@ -277,6 +277,7 @@ public sealed class MainWindow : Window
         ImGui.TextColored(Gold, "SENTINEL PROFILES");
         ImGui.TextWrapped("Manual plugin configuration switching");
         DrawThemeSelector();
+        DrawServerInfoSetting();
 
         var lastApplied = profiles.LastAppliedProfile;
         var drift = driftDetector.Evaluate(lastApplied, discovery.Snapshot);
@@ -533,6 +534,8 @@ public sealed class MainWindow : Window
                 scale: ImGuiHelpers.GlobalScale);
 
             ImGui.Spacing();
+            DrawServerInfoSetting();
+            ImGui.Spacing();
             var reducedMotion = pluginInterface.UiBuilder.ShouldUseReducedMotion;
             SentinelModernStatusPill.Draw(
                 new SentinelModernStatusPillOptions(
@@ -710,6 +713,21 @@ public sealed class MainWindow : Window
 
         configuration.Theme = (int)SentinelThemeKind.Classic;
         saveConfiguration();
+    }
+
+    private void DrawServerInfoSetting()
+    {
+        var show = configuration.ShowProfileInServerInfoBar;
+        var changed = modernThemeActive
+            ? SentinelModernSwitch.Draw("profile-server-info", "Show profile in server info bar",
+                ref show, modernShellState.Motion, ImGuiHelpers.GlobalScale)
+            : ImGui.Checkbox("Show profile in server info bar", ref show);
+        if (changed)
+        {
+            configuration.ShowProfileInServerInfoBar = show;
+            saveConfiguration();
+        }
+        ImGui.TextWrapped("Shows the last applied profile. ! means plugin states differ or application reported a problem. Click the bar entry to open Profiles.");
     }
 
     private void DrawThemeSelector()

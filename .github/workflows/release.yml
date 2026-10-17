@@ -2,6 +2,8 @@ name: Publish Beta
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
 
 permissions:
   contents: write
@@ -12,7 +14,7 @@ concurrency:
 
 jobs:
   publish:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[publish-live]'))
     runs-on: windows-latest
 
     steps:
@@ -87,7 +89,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "Keeps Enable, Leave Alone, and Disable beside each other in the Profile State column at supported window widths, reducing plugin list scrolling in Sentinel Modern and Classic. Labels remain readable, and extra-narrow layouts still reflow. Profile rules and restart semantics are unchanged; in-game confirmation is pending." `
+            --notes "Adds an optional server info bar entry showing the last applied Sentinel profile, live drift warning, applying/none states, tooltip and click-to-open. Default OFF; enable in Profiles Appearance (Classic header). Editor selection, apply/restart semantics, configuration and Core 0.3.1 remain unchanged." `
             --prerelease
 
       - name: Verify public release asset
