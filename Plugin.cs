@@ -17,6 +17,8 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
     [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
     [PluginService] internal static IFramework Framework { get; private set; } = null!;
+    [PluginService] internal static IDtrBar DtrBar { get; private set; } = null!;
+    [PluginService] internal static IPlayerState PlayerState { get; private set; } = null!;
     [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
@@ -28,6 +30,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly ApplicationCoordinator applicationCoordinator;
     private readonly DriftDetector driftDetector;
     private readonly MainWindow mainWindow;
+    private readonly ProfileDtrBar profileBar;
     private DateTime nextDisplayNameRefreshUtc = DateTime.MinValue;
 
     public Plugin()
@@ -52,6 +55,15 @@ public sealed class Plugin : IDalamudPlugin
             ReapplyLastProfile,
             SaveConfiguration);
 
+        profileBar = new ProfileDtrBar(DtrBar,
+            () => Configuration.ShowProfileInServerInfoBar,
+            () => PlayerState.IsLoaded,
+            () => ProfileBarPresentation.Create(Profiles.LastAppliedProfile,
+                driftDetector.Evaluate(Profiles.LastAppliedProfile, discovery.Snapshot),
+                applicationCoordinator.IsBusy, applicationCoordinator.Progress?.ProfileName,
+                applicationCoordinator.FatalError is not null ||
+                    applicationCoordinator.LastResult is { Succeeded: false }),
+            OpenMainWindow, Log);
         windows.AddWindow(mainWindow);
         applicationCoordinator.Completed += OnApplyCompleted;
 
@@ -82,6 +94,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi -= OpenMainWindow;
         CommandManager.RemoveHandler(CommandName);
         applicationCoordinator.Completed -= OnApplyCompleted;
+        profileBar.Dispose();
         windows.RemoveAllWindows();
         mainWindow.Dispose();
         applicationCoordinator.Dispose();
@@ -100,6 +113,7 @@ public sealed class Plugin : IDalamudPlugin
             Profiles.RefreshLastKnownDisplayNames(discovery.Snapshot);
         }
         applicationCoordinator.Update();
+        profileBar.Update();
     }
 
     private bool ApplyProfile(PluginProfile profile, ApplyOrigin origin)

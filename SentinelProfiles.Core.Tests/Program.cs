@@ -20,6 +20,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Unsupported plugins fail safely without blocking others", TestUnsupported),
     ("Self-protection blocks unsafe rules", TestSelfProtection),
     ("Drift ignores Leave Alone and detects managed changes", TestDrift),
+    ("Server info display follows last applied rather than editor selection", TestProfileBar),
+    ("Server info display preference defaults OFF and round-trips", TestProfileBarPreference),
 };
 
 var failures = new List<string>();
@@ -306,6 +308,45 @@ static Task TestDrift()
     Assert(detector.Evaluate(profile, installed).State == DriftState.Drifted, "Managed state change should drift.");
     profile.SetState("Managed", "Managed", ProfilePluginState.LeaveAlone);
     Assert(detector.Evaluate(profile, installed).State == DriftState.Matched, "Leave Alone should never drift.");
+    return Task.CompletedTask;
+}
+
+static Task TestProfileBar()
+{
+    var config = new ProfileConfigurationData();
+    var service = new ProfileService(config, new PluginSafetyPolicy(), () => {});
+    service.TryCreateBlank("Hunts", out var applied, out _);
+    applied!.SetState("Managed", "Managed", ProfilePluginState.Enable);
+    service.MarkApplied(applied.Id);
+    service.TryCreateBlank("Raid editor selection", out _, out _);
+    var detector = new DriftDetector(new PluginSafetyPolicy());
+    var matched = detector.Evaluate(service.LastAppliedProfile, new[] { Plugin("Managed", true) });
+    var label = ProfileBarPresentation.Create(service.LastAppliedProfile, matched);
+    Assert(label.Text == "Profiles: Hunts" && !label.Text.Contains("Raid"), "Editor selection must not imply application.");
+    var drifted = detector.Evaluate(applied, new[] { Plugin("Managed", false) });
+    Assert(ProfileBarPresentation.Create(applied, drifted).Text.EndsWith(" !"), "Drift must warn.");
+    Assert(ProfileBarPresentation.Create(applied, matched, applyProblems: true).Text.EndsWith(" !"), "Partial apply must warn even if current states match.");
+    Assert(ProfileBarPresentation.Create(applied, matched, true, "Next").Text == "Profiles: applying", "In-progress apply must not claim completion.");
+    Assert(ProfileBarPresentation.Create(null, detector.Evaluate(null, [])).Text == "Profiles: none", "No applied profile must be explicit.");
+    var round = JsonSerializer.Deserialize<ProfileConfigurationData>(JsonSerializer.Serialize(config))!;
+    var restarted = new ProfileService(round, new PluginSafetyPolicy(), () => {});
+    Assert(ProfileBarPresentation.Create(restarted.LastAppliedProfile, drifted).Text == "Profiles: Hunts !", "Restart must not imply saved states were re-applied.");
+    applied.Name = new string('x', 64) + "\n";
+    var longName = ProfileBarPresentation.Create(applied, matched);
+    Assert(longName.Text.Length < 40 && !longName.Text.Contains('\n'), "Long/control names must remain bounded plain text.");
+    service.Delete(applied);
+    Assert(service.LastAppliedProfile is null, "Deleting applied profile must clear display source.");
+    return Task.CompletedTask;
+}
+
+static Task TestProfileBarPreference()
+{
+    Assert(!new ProfileConfigurationData().ShowProfileInServerInfoBar, "Existing users default OFF.");
+    var old = JsonSerializer.Deserialize<ProfileConfigurationData>("{\"Version\":3}")!;
+    Assert(!old.ShowProfileInServerInfoBar, "Missing preference must stay OFF.");
+    old.ShowProfileInServerInfoBar = true;
+    Assert(JsonSerializer.Deserialize<ProfileConfigurationData>(JsonSerializer.Serialize(old))!.ShowProfileInServerInfoBar,
+        "Display option must persist.");
     return Task.CompletedTask;
 }
 

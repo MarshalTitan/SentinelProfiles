@@ -17,6 +17,8 @@ public class ProfileConfigurationData
 
     public bool ShowInternalNames { get; set; } = true;
 
+    public bool ShowProfileInServerInfoBar { get; set; } // Optional; existing users default OFF.
+
     /// <summary>
     /// Persisted <c>SentinelThemeKind</c> value. Schema-one users migrate explicitly
     /// to Classic (0); Sentinel Core normalizes this value again at the UI boundary.
