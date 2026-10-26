@@ -355,7 +355,7 @@ public sealed class MainWindow : Window
                 {
                     foreach (var problem in result.Problems)
                     {
-                        ImGui.TextWrapped($"• {problem.DisplayName}: {problem.Reason}");
+                        ImGui.TextWrapped($" {problem.DisplayName}: {problem.Reason}");
                         if (configuration.ShowInternalNames
                             && !problem.DisplayName.Equals(problem.InternalName, StringComparison.OrdinalIgnoreCase))
                         {
@@ -591,6 +591,15 @@ public sealed class MainWindow : Window
             _ => throw new ArgumentOutOfRangeException(nameof(id), id, "Unknown primary page."),
         };
 
+    public void OpenProfile(Guid id)
+    {
+        if(profiles.Find(id) is null||coordinator.IsBusy)return;
+        profiles.Select(id);
+        selectedPlugins.Clear();
+        modernPage=ModernPage.Profiles;
+        OpenAndExpand();
+    }
+
     public void OpenAndExpand()
     {
         IsOpen = true;
@@ -769,7 +778,7 @@ public sealed class MainWindow : Window
         foreach (var profile in profiles.Profiles)
         {
             var selected = profiles.SelectedProfile?.Id == profile.Id;
-            var suffix = profiles.LastAppliedProfile?.Id == profile.Id ? "  • Last" : string.Empty;
+            var suffix = profiles.LastAppliedProfile?.Id == profile.Id ? "   Last" : string.Empty;
             var label = profile.Name + suffix;
             var scale = ImGuiHelpers.GlobalScale;
             var width = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
