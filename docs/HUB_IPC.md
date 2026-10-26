@@ -11,6 +11,6 @@ Snapshots rebuild only for configuration invalidation, changed installed-plugin 
 
 Automated checks cover projection/privacy, stable IDs through rename, deletion, empty/applied/drifted/busy/unavailable states and existing profile behavior. In-game acceptance: saved names appear in Hub; selection and last-applied badges differ correctly; Open only selects/opens; apply from Profiles updates status; disable/re-enable Profiles clears/recovers without errors. Existing server-info-bar and editor behavior remain unchanged.
 
-## Live-feedback authorization — 2026-10-26
+## Release validation — 2026-10-26
 
-The user explicitly requested commit/merge/live publication of Profiles 0.2.1.8 and Hub 0.7.1.0 through normal updates so their girlfriend can report any differences. Software tests and candidate-package validation passed. The earlier pre-release combined acceptance is deferred to post-update observation; no in-game PASS is claimed. Publish Profiles first, then Hub, preserving saved settings and the existing immutable release/distribution checks.
+Software tests and candidate-package validation passed. Combined in-game validation with Hub 0.7.1.0 follows publication and remains pending; no in-game PASS is claimed. Publish Profiles first, then Hub, preserving saved settings and the existing immutable release/distribution checks.
