@@ -16,7 +16,8 @@ public sealed class HubProfilesIpc : IDisposable
     private readonly ICallGateProvider<long,object?> changed;
     private readonly ICallGateProvider<string,bool> openProfile;
     private readonly ICallGateProvider<int> health;
-    private bool dirty=true,disposed;
+    private volatile bool dirty=true;
+    private bool disposed;
     private bool previousBusy;
     private long inventoryRevision=-1,revision;
     private string content="",semantic="";
@@ -57,6 +58,8 @@ public sealed class HubProfilesIpc : IDisposable
     public void Dispose()
     {
         disposed=true;
-        snapshot.UnregisterFunc();openProfile.UnregisterFunc();health.UnregisterFunc();
+        try{snapshot.UnregisterFunc();}catch{}
+        try{openProfile.UnregisterFunc();}catch{}
+        try{health.UnregisterFunc();}catch{}
     }
 }
