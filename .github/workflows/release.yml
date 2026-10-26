@@ -89,7 +89,7 @@ jobs:
             --repo '${{ github.repository }}' `
             --target '${{ github.sha }}' `
             --title "Sentinel Profiles ${{ steps.version.outputs.value }} beta" `
-            --notes "Adds an optional server info bar entry showing the last applied Sentinel profile, live drift warning, applying/none states, tooltip and click-to-open. Default OFF; enable in Profiles Appearance (Classic header). Editor selection, apply/restart semantics, configuration and Core 0.3.1 remain unchanged." `
+            --notes-file docs/RELEASE_NOTES.md `
             --prerelease
 
       - name: Verify public release asset
