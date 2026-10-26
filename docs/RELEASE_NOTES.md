@@ -5,3 +5,4 @@ Adds a cached, versioned Hub overview contract for saved profile names/stable ID
 Hub can request that a valid profile be opened in the existing editor. This changes editor selection only; it never applies a profile, edits rules, or toggles plugins. Opening is refused during application. Unsupported/off-thread calls fail safely and providers unregister on unload.
 
 Profile management, existing apply/restart behavior, saved settings/layouts and the optional server-info-bar display remain unchanged. Core UI remains exactly 0.3.1. See docs/HUB_IPC.md for the additive public contract and acceptance checks.
+The user authorized normal live publication on 2026-10-26 alongside Hub 0.7.1.0 so their girlfriend can evaluate the update. Software tests and package validation passed; combined in-game observation remains unreported.
