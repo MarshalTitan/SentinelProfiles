@@ -591,6 +591,15 @@ public sealed class MainWindow : Window
             _ => throw new ArgumentOutOfRangeException(nameof(id), id, "Unknown primary page."),
         };
 
+    public void OpenProfile(Guid id)
+    {
+        if(profiles.Find(id) is null||coordinator.IsBusy)return;
+        profiles.Select(id);
+        selectedPlugins.Clear();
+        modernPage=ModernPage.Profiles;
+        OpenAndExpand();
+    }
+
     public void OpenAndExpand()
     {
         IsOpen = true;

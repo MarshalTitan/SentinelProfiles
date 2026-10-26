@@ -31,6 +31,7 @@ public sealed class Plugin : IDalamudPlugin
     private readonly DriftDetector driftDetector;
     private readonly MainWindow mainWindow;
     private readonly ProfileDtrBar profileBar;
+    private readonly HubProfilesIpc? hubIpc;
     private DateTime nextDisplayNameRefreshUtc = DateTime.MinValue;
 
     public Plugin()
@@ -65,6 +66,7 @@ public sealed class Plugin : IDalamudPlugin
                     applicationCoordinator.LastResult is { Succeeded: false }),
             OpenMainWindow, Log);
         windows.AddWindow(mainWindow);
+        hubIpc=new(PluginInterface,Framework,Profiles,discovery,applicationCoordinator,driftDetector,mainWindow.OpenProfile);
         applicationCoordinator.Completed += OnApplyCompleted;
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
@@ -94,6 +96,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.OpenConfigUi -= OpenMainWindow;
         CommandManager.RemoveHandler(CommandName);
         applicationCoordinator.Completed -= OnApplyCompleted;
+        hubIpc?.Dispose();
         profileBar.Dispose();
         windows.RemoveAllWindows();
         mainWindow.Dispose();
@@ -102,7 +105,11 @@ public sealed class Plugin : IDalamudPlugin
         discovery.Dispose();
     }
 
-    public void SaveConfiguration() => PluginInterface.SavePluginConfig(Configuration);
+    public void SaveConfiguration()
+    {
+        PluginInterface.SavePluginConfig(Configuration);
+        hubIpc?.Invalidate();
+    }
 
     private void OnFrameworkUpdate(IFramework _)
     {
@@ -113,6 +120,7 @@ public sealed class Plugin : IDalamudPlugin
             Profiles.RefreshLastKnownDisplayNames(discovery.Snapshot);
         }
         applicationCoordinator.Update();
+        hubIpc?.Tick();
         profileBar.Update();
     }
 

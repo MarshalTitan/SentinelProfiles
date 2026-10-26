@@ -1,0 +1,16 @@
+# Hub integration contract v1
+
+Additive contract for Profiles 0.2.1.8. No Hub dependency, rule changes, apply/restart changes, configuration migration or Core upgrade. Core UI remains 0.3.1. Profiles remains authoritative.
+
+- `SentinelProfiles.Hub.v1.Snapshot`: `GetIpcSubscriber<string>`, framework-thread function. Cached JSON `{Schema:1,Revision,Profiles:[{Id,Name}],SelectedProfileId,LastAppliedProfileId,Match,Applying}`. GUIDs use D format; nullable selected/applied IDs. Match is NoProfileApplied, Matched, Drifted or Unavailable. Drift describes the last applied profile, not an unapplied editor selection. No rules, private configuration or paths are exposed.
+- `SentinelProfiles.Hub.v1.Changed`: `GetIpcSubscriber<long,object?>`, message carrying revision only. Subscribe/unsubscribe with the same callback. A change marks client cache dirty; clients fetch on demand. Schema and projection are independent of configuration serialization.
+- `SentinelProfiles.Hub.v1.Open`: `GetIpcSubscriber<string,bool>`, framework-thread function. Opens a valid saved ID in the existing editor, selecting it using normal Profiles selection semantics. Returns false while busy, unavailable, off-thread or for an invalid/deleted ID. Never applies a profile, edits rules, toggles plugins or exposes an apply endpoint.
+- `Sentinel.SentinelProfiles.Health.v1`: primitive read-only health function (0 while available).
+
+Snapshots rebuild only for configuration invalidation, changed installed-plugin observations, or an application busy transition. Semantically identical results reuse the cached JSON without notification. Installed-plugin comparison occurs on Profiles' existing discovery cadence. An unavailable inventory yields Unavailable, not a stale matched claim. Hub queues all reads/open actions to its framework update; notifications carry no game objects. Providers unregister on unload; clients discard runtime availability on plugin-change notifications and retry unsupported IPC only while their overview is open.
+
+Automated checks cover projection/privacy, stable IDs through rename, deletion, empty/applied/drifted/busy/unavailable states and existing profile behavior. In-game acceptance: saved names appear in Hub; selection and last-applied badges differ correctly; Open only selects/opens; apply from Profiles updates status; disable/re-enable Profiles clears/recovers without errors. Existing server-info-bar and editor behavior remain unchanged.
+
+## Release validation — 2026-10-26
+
+Software tests and candidate-package validation passed. Combined in-game validation with Hub 0.7.1.0 follows publication and remains pending; no in-game PASS is claimed. Publish Profiles first, then Hub, preserving saved settings and the existing immutable release/distribution checks.

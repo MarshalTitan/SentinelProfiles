@@ -1,6 +1,7 @@
 using System.Text.Json;
 using SentinelProfiles.Core;
 using SentinelProfiles.Models;
+using SentinelProfiles.Core.Tests;
 
 var tests = new (string Name, Func<Task> Run)[]
 {
@@ -22,6 +23,8 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Drift ignores Leave Alone and detects managed changes", TestDrift),
     ("Server info display follows last applied rather than editor selection", TestProfileBar),
     ("Server info display preference defaults OFF and round-trips", TestProfileBarPreference),
+    ("Hub IPC snapshot uses stable IDs and projects no private profile rules", HubSnapshotTests.Projection),
+    ("Hub IPC handles empty and matched states", HubSnapshotTests.EmptyAndMatched),
 };
 
 var failures = new List<string>();

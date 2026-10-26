@@ -15,6 +15,8 @@ public sealed class InstalledPluginDiscoveryService : IDisposable
     private IReadOnlyList<InstalledPluginInfo> plugins = [];
     private DateTime refreshAfterUtc = DateTime.MinValue;
     private bool dirty = true;
+    public long Revision { get; private set; }
+    public bool Available { get; private set; }
 
     public InstalledPluginDiscoveryService(IDalamudPluginInterface pluginInterface, IPluginLog log)
     {
@@ -66,7 +68,8 @@ public sealed class InstalledPluginDiscoveryService : IDisposable
 
             lock (gate)
             {
-                plugins = refreshed;
+                if(!Available || !plugins.SequenceEqual(refreshed))Revision++;
+                Available=true;plugins = refreshed;
                 dirty = false;
                 refreshAfterUtc = DateTime.UtcNow + RefreshInterval;
             }
@@ -78,7 +81,9 @@ public sealed class InstalledPluginDiscoveryService : IDisposable
             log.Warning(exception, "Could not refresh the installed Dalamud plugin list.");
             lock (gate)
             {
-                dirty = true;
+                if(Available)Revision++;
+                Available=false;
+                dirty = false; // Respect the existing retry interval after an unavailable capture.
                 refreshAfterUtc = DateTime.UtcNow + RefreshInterval;
                 return plugins;
             }
