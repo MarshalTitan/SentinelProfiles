@@ -16,7 +16,12 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
     Func<Guid?> lastAppliedId, Func<bool> isBusy, Func<Guid, bool> apply,
     Action open, IPluginLog log) : IDisposable
 {
-    public Window QuickMenuWindow { get; } = new QuickSwitchWindow(profiles, lastAppliedId, isBusy, apply, open);
+    public Window QuickMenuWindow { get; } = new QuickSwitchWindow(profiles, lastAppliedId, isBusy, apply, open)
+    {
+        ShowCloseButton = false,
+        AllowPinning = false,
+        AllowClickthrough = false,
+    };
 
     private QuickSwitchWindow Menu => (QuickSwitchWindow)QuickMenuWindow;
     private IDtrBarEntry? entry;
