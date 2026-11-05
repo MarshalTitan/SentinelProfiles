@@ -1,6 +1,6 @@
 # Profiles UI repair validation
 
-Version: 0.2.1.12. Scope: quick switch input and focus.
+Version: 0.2.1.13. Scope: quick switch seven-second inactivity timeout.
 
 ## Automated
 
@@ -43,6 +43,9 @@ At 680 × 560 and 1080 × 720 logical pixels, in both themes and at 100/150/200%
    from it with the editor closed; verify the click actually applies the profile,
    busy state, long names, scrolling, top-bar second-click dismissal, and that
    Open Profiles actually opens the editor. Check mouse and controller focus.
+   Leave the picker idle for seven seconds, including with the game unfocused;
+   it should close. Move/scroll/navigate inside it and check that the timeout
+   restarts, while a stationary pointer does not keep it open forever.
 5. Appearance: reach and activate Switch to Classic at minimum width.
 6. Keyboard/gamepad navigation: focus and activate profile entries, actions,
    search/filter, selection, state controls, Open/Settings, and modal buttons; scrolling follows

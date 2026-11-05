@@ -99,7 +99,7 @@ does not provide the corresponding window. Names and buttons share a row when
 they fit and reflow at narrower widths. These shortcuts do not change profile
 rules or load states.
 
-## Profile order and quick switching (0.2.1.12)
+## Profile order and quick switching (0.2.1.13)
 
 Drag saved profiles to reorder the sidebar without interrupting the editor; their order persists with the existing
 configuration. Move Up and Move Down provide keyboard/controller alternatives.
@@ -108,7 +108,9 @@ Installed plugins still sort before missing plugins in the editor.
 The optional **Profiles: ...** server-info entry toggles a small, scrollable
 Sentinel-styled profile list without a title bar. The picker is hosted by the
 same Dalamud window system as the editor so its profile choices and Open Profiles
-button receive normal mouse and controller focus. Choosing a profile applies it immediately with the existing
+button receive normal mouse and controller focus. It closes after seven seconds
+without interaction; pointer motion, scrolling, or navigation in the picker
+restart the timer. Choosing a profile applies it immediately with the existing
 switching engine, without opening the editor; unavailable controls are disabled
 while an application is underway. **Open Profiles** opens the full editor.
 Plugin Open and Settings buttons carry inline vector icons with measured spacing
