@@ -1,6 +1,6 @@
 # Profiles UI repair validation
 
-Version: 0.2.1.11. Scope: drag safety, compact quick switch, and button icon spacing.
+Version: 0.2.1.12. Scope: quick switch input and focus.
 
 ## Automated
 
@@ -17,8 +17,9 @@ Version: 0.2.1.11. Scope: drag safety, compact quick switch, and button icon spa
 - Sidebar rendering iterates a snapshot, so a drop that saves a new order within
   the draw frame cannot invalidate the current profile enumerator.
 - CI builds against Dalamud API 15 and validates the installable ZIP.
-- The optional bar picker uses the existing application coordinator; profile
-  rules and restart switching logic are untouched.
+- The quick switch is registered with the same Dalamud WindowSystem as the
+  main editor. Its profile selection uses the existing application coordinator;
+  profile rules and restart switching logic are untouched.
 
 ## In-game checks (pending; not claimed by CI)
 
@@ -39,8 +40,9 @@ At 680 × 560 and 1080 × 720 logical pixels, in both themes and at 100/150/200%
    verify the saved order. Move Up/Down must work through keyboard/controller focus.
    Click the server-info bar entry to toggle a Sentinel-styled, titleless list
    of only profile names and Open Profiles. Apply a profile
-   from it with the editor closed; verify busy state, long names, scrolling,
-   outside-click dismissal, second-click dismissal, and Open Profiles.
+   from it with the editor closed; verify the click actually applies the profile,
+   busy state, long names, scrolling, top-bar second-click dismissal, and that
+   Open Profiles actually opens the editor. Check mouse and controller focus.
 5. Appearance: reach and activate Switch to Classic at minimum width.
 6. Keyboard/gamepad navigation: focus and activate profile entries, actions,
    search/filter, selection, state controls, Open/Settings, and modal buttons; scrolling follows

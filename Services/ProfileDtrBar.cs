@@ -2,6 +2,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Gui.Dtr;
 using Dalamud.Interface.Utility;
+using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using SentinelCore.UI;
 using SentinelProfiles.Core;
@@ -15,15 +16,19 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
     Func<Guid?> lastAppliedId, Func<bool> isBusy, Func<Guid, bool> apply,
     Action open, IPluginLog log) : IDisposable
 {
-    private readonly SentinelModernStyleScope menuStyle = new();
+    public Window QuickMenuWindow { get; } = new QuickSwitchWindow(profiles, lastAppliedId, isBusy, apply, open)
+    {
+        ShowCloseButton = false,
+        AllowPinning = false,
+        AllowClickthrough = false,
+    };
+
+    private QuickSwitchWindow Menu => (QuickSwitchWindow)QuickMenuWindow;
     private IDtrBarEntry? entry;
     private ProfileBarPresentation? previous;
     private DateTime nextRefresh;
     private bool faulted;
     private bool disposed;
-    private bool quickMenuOpen;
-    private bool skipOutsideClick;
-    private Vector2 menuAnchor;
 
     public void Update()
     {
@@ -31,14 +36,14 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
         if (!enabled())
         {
             if (entry is not null) entry.Shown = false;
-            quickMenuOpen = false;
+            Menu.IsOpen = false;
             faulted = false;
             return;
         }
         if (!loggedIn())
         {
             if (entry is not null) entry.Shown = false;
-            quickMenuOpen = false;
+            Menu.IsOpen = false;
             return;
         }
         if (faulted || DateTime.UtcNow < nextRefresh) return;
@@ -66,112 +71,114 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
 
     private void OnEntryClicked(DtrInteractionEvent interaction)
     {
-        quickMenuOpen = !quickMenuOpen;
-        skipOutsideClick = quickMenuOpen;
-        menuAnchor = interaction.Position;
+        Menu.IsOpen = !Menu.IsOpen;
+        if (Menu.IsOpen)
+        {
+            Menu.Anchor = interaction.Position;
+            Menu.RequestFocus = true;
+        }
     }
 
-    public void DrawQuickMenu()
+    // Use Dalamud's window host for mouse and controller focus just like the main editor.
+    // A standalone ImGui.Begin from UiBuilder.Draw can render over the game while its
+    // contents fail to receive clicks in the server-info area.
+    private sealed class QuickSwitchWindow(
+        Func<IReadOnlyList<PluginProfile>> profiles,
+        Func<Guid?> lastAppliedId,
+        Func<bool> isBusy,
+        Func<Guid, bool> apply,
+        Action open) : Window("Profiles quick switch##SentinelProfiles.DtrMenu",
+            ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoSavedSettings |
+            ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove), IDisposable
     {
-        if (disposed || !enabled() || !loggedIn() || !quickMenuOpen)
-            return;
+        private readonly SentinelModernStyleScope style = new();
 
-        var scale = ImGuiHelpers.GlobalScale;
-        var display = ImGui.GetIO().DisplaySize;
-        var width = MathF.Min(280f * scale, MathF.Max(1f, display.X - 16f * scale));
-        var snapshot = profiles().ToArray();
-        var height = MathF.Min(MathF.Max(1f, display.Y - 16f * scale),
-            MathF.Max(94f * scale, 66f * scale + snapshot.Length * ImGui.GetFrameHeightWithSpacing()));
-        var x = Math.Clamp(menuAnchor.X - width / 2f, 8f * scale,
-            MathF.Max(8f * scale, display.X - width - 8f * scale));
-        var y = Math.Clamp(menuAnchor.Y + 16f * scale, 8f * scale,
-            MathF.Max(8f * scale, display.Y - height - 8f * scale));
+        public Vector2 Anchor { get; set; }
 
-        // Core supplies the shared Modern colours, borders, rounding, and spacing.
-        // The bar entry is the toggle, so this compact panel needs no title bar or X.
-        menuStyle.Push(scale);
-        try
+        public override void PreDraw()
         {
-            ImGui.SetNextWindowPos(new Vector2(x, y), ImGuiCond.Always);
-            ImGui.SetNextWindowSize(new Vector2(width, height), ImGuiCond.Always);
-            var visible = ImGui.Begin("Profiles quick switch##SentinelProfiles.DtrMenu",
-                ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoSavedSettings |
-                ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove);
-            try
+            var scale = ImGuiHelpers.GlobalScale;
+            style.Push(scale);
+            var display = ImGui.GetIO().DisplaySize;
+            var width = MathF.Min(280f * scale, MathF.Max(1f, display.X - 16f * scale));
+            var height = MathF.Min(MathF.Max(1f, display.Y - 16f * scale),
+                MathF.Max(94f * scale, 66f * scale + profiles().Count * ImGui.GetFrameHeightWithSpacing()));
+            Position = new Vector2(
+                Math.Clamp(Anchor.X - width / 2f, 8f * scale,
+                    MathF.Max(8f * scale, display.X - width - 8f * scale)),
+                Math.Clamp(Anchor.Y + 16f * scale, 8f * scale,
+                    MathF.Max(8f * scale, display.Y - height - 8f * scale)));
+            PositionCondition = ImGuiCond.Always;
+            Size = new Vector2(width, height) / scale;
+            SizeCondition = ImGuiCond.Always;
+        }
+
+        public override void PostDraw() => style.Pop();
+
+        public override void Draw()
+        {
+            var scale = ImGuiHelpers.GlobalScale;
+            var snapshot = profiles().ToArray();
+            var listHeight = MathF.Max(1f, ImGui.GetContentRegionAvail().Y -
+                38f * scale - ImGui.GetStyle().ItemSpacing.Y);
+            if (ImGui.BeginChild("##SentinelProfiles.QuickList", new Vector2(0f, listHeight)))
             {
-                if (!visible)
-                    return;
+                if (snapshot.Length == 0)
+                    ImGui.TextWrapped("No profiles yet.");
 
-                var listHeight = MathF.Max(1f, ImGui.GetContentRegionAvail().Y -
-                    38f * scale - ImGui.GetStyle().ItemSpacing.Y);
-                if (ImGui.BeginChild("##SentinelProfiles.QuickList", new Vector2(0f, listHeight)))
+                ImGui.BeginDisabled(isBusy());
+                ImGui.PushStyleColor(ImGuiCol.Header, SentinelModernPalette.NavigationSelected);
+                try
                 {
-                    if (snapshot.Length == 0)
-                        ImGui.TextWrapped("No profiles yet.");
-
-                    ImGui.BeginDisabled(isBusy());
-                    ImGui.PushStyleColor(ImGuiCol.Header, SentinelModernPalette.NavigationSelected);
-                    try
+                    foreach (var profile in snapshot)
                     {
-                        foreach (var profile in snapshot)
+                        var selected = lastAppliedId() == profile.Id;
+                        var label = profile.Name;
+                        var padding = ImGui.GetStyle().FramePadding;
+                        var widthAvailable = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
+                        var textWidth = MathF.Max(1f, widthAvailable - 2f * padding.X);
+                        var rowHeight = MathF.Max(ImGui.GetFrameHeight(),
+                            ImGui.CalcTextSize(label, false, textWidth).Y + 2f * padding.Y);
+                        var origin = ImGui.GetCursorScreenPos();
+                        if (ImGui.Selectable($"##quick-{profile.Id:N}", selected,
+                                ImGuiSelectableFlags.None, new Vector2(widthAvailable, rowHeight)))
                         {
-                            var selected = lastAppliedId() == profile.Id;
-                            var label = profile.Name;
-                            var padding = ImGui.GetStyle().FramePadding;
-                            var widthAvailable = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
-                            var textWidth = MathF.Max(1f, widthAvailable - 2f * padding.X);
-                            var rowHeight = MathF.Max(ImGui.GetFrameHeight(),
-                                ImGui.CalcTextSize(label, false, textWidth).Y + 2f * padding.Y);
-                            var origin = ImGui.GetCursorScreenPos();
-                            if (ImGui.Selectable($"##quick-{profile.Id:N}", selected,
-                                    ImGuiSelectableFlags.None, new Vector2(widthAvailable, rowHeight))
-                                && apply(profile.Id))
-                                quickMenuOpen = false;
-
-                            var next = ImGui.GetCursorScreenPos();
-                            ImGui.SetCursorScreenPos(origin + padding);
-                            ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + textWidth);
-                            ImGui.TextUnformatted(label);
-                            ImGui.PopTextWrapPos();
-                            ImGui.SetCursorScreenPos(next);
+                            if (apply(profile.Id))
+                                IsOpen = false;
                         }
-                    }
-                    finally
-                    {
-                        ImGui.PopStyleColor();
-                        ImGui.EndDisabled();
-                    }
-                }
-                ImGui.EndChild();
-                if (SentinelModernActionDock.PrimaryButton(
-                        "SentinelProfiles.OpenProfiles", "Open Profiles", new Vector2(-1f, 0f), scale))
-                {
-                    quickMenuOpen = false;
-                    open();
-                }
 
-                if (!skipOutsideClick && ImGui.IsMouseClicked(ImGuiMouseButton.Left)
-                    && !ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows))
-                    quickMenuOpen = false;
-                skipOutsideClick = false;
+                        var next = ImGui.GetCursorScreenPos();
+                        ImGui.SetCursorScreenPos(origin + padding);
+                        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + textWidth);
+                        ImGui.TextUnformatted(label);
+                        ImGui.PopTextWrapPos();
+                        ImGui.SetCursorScreenPos(next);
+                    }
+                }
+                finally
+                {
+                    ImGui.PopStyleColor();
+                    ImGui.EndDisabled();
+                }
             }
-            finally
+            ImGui.EndChild();
+            if (SentinelModernActionDock.PrimaryButton(
+                    "SentinelProfiles.OpenProfiles", "Open Profiles", new Vector2(-1f, 0f), scale))
             {
-                ImGui.End();
+                IsOpen = false;
+                open();
             }
         }
-        finally
-        {
-            menuStyle.Pop();
-        }
+
+        public void Dispose() => style.Dispose();
     }
 
     public void Dispose()
     {
         if (disposed) return;
         disposed = true;
-        quickMenuOpen = false;
-        menuStyle.Dispose();
+        Menu.IsOpen = false;
+        Menu.Dispose();
         if (entry is null) return;
         entry.OnClick = null;
         entry.Remove();

@@ -72,6 +72,7 @@ public sealed class Plugin : IDalamudPlugin
                          ApplyProfile(profile, ApplyOrigin.UserInterface),
             OpenMainWindow, Log);
         windows.AddWindow(mainWindow);
+        windows.AddWindow(profileBar.QuickMenuWindow);
         hubIpc=new(PluginInterface,Framework,Profiles,discovery,applicationCoordinator,driftDetector,mainWindow.OpenProfile);
         applicationCoordinator.Completed += OnApplyCompleted;
 
@@ -81,7 +82,6 @@ public sealed class Plugin : IDalamudPlugin
         });
 
         PluginInterface.UiBuilder.Draw += windows.Draw;
-        PluginInterface.UiBuilder.Draw += profileBar.DrawQuickMenu;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainWindow;
         PluginInterface.UiBuilder.OpenConfigUi += OpenMainWindow;
         Framework.Update += OnFrameworkUpdate;
@@ -99,7 +99,6 @@ public sealed class Plugin : IDalamudPlugin
     {
         Framework.Update -= OnFrameworkUpdate;
         PluginInterface.UiBuilder.Draw -= windows.Draw;
-        PluginInterface.UiBuilder.Draw -= profileBar.DrawQuickMenu;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainWindow;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenMainWindow;
         CommandManager.RemoveHandler(CommandName);
