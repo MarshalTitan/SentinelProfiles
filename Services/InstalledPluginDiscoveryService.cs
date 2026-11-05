@@ -61,7 +61,9 @@ public sealed class InstalledPluginDiscoveryService : IDisposable
                     plugin.IsBanned,
                     plugin.IsOrphaned,
                     plugin.IsDecommissioned,
-                    plugin.IsDev))
+                    plugin.IsDev,
+                    plugin.HasMainUi,
+                    plugin.HasConfigUi))
                 .OrderBy(plugin => plugin.DisplayName, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(plugin => plugin.InternalName, StringComparer.OrdinalIgnoreCase)
                 .ToArray();

@@ -4,6 +4,7 @@ using Dalamud.Interface;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
+using Dalamud.Plugin.Services;
 using SentinelCore.UI;
 using SentinelProfiles.Core;
 using SentinelProfiles.Models;
@@ -59,6 +60,7 @@ public sealed class MainWindow : Window
 
     private readonly Configuration configuration;
     private readonly IDalamudPluginInterface pluginInterface;
+    private readonly IPluginLog log;
     private readonly ProfileService profiles;
     private readonly PluginSafetyPolicy safetyPolicy;
     private readonly InstalledPluginDiscoveryService discovery;
@@ -84,6 +86,8 @@ public sealed class MainWindow : Window
     private string search = string.Empty;
     private string modalName = string.Empty;
     private string modalError = string.Empty;
+    private string? pluginUiErrorInternalName;
+    private string? pluginUiError;
     private bool newModalOpen;
     private bool renameModalOpen;
     private bool deleteModalOpen;
@@ -95,6 +99,7 @@ public sealed class MainWindow : Window
     public MainWindow(
         Configuration configuration,
         IDalamudPluginInterface pluginInterface,
+        IPluginLog log,
         ProfileService profiles,
         PluginSafetyPolicy safetyPolicy,
         InstalledPluginDiscoveryService discovery,
@@ -107,6 +112,7 @@ public sealed class MainWindow : Window
     {
         this.configuration = configuration;
         this.pluginInterface = pluginInterface;
+        this.log = log;
         this.profiles = profiles;
         this.safetyPolicy = safetyPolicy;
         this.discovery = discovery;
@@ -1127,7 +1133,7 @@ public sealed class MainWindow : Window
             }
 
             ImGui.TableSetColumnIndex(1);
-            ImGui.TextWrapped(row.DisplayName);
+            DrawPluginIdentity(row);
             if (configuration.ShowInternalNames
                 && !row.DisplayName.Equals(row.InternalName, StringComparison.OrdinalIgnoreCase))
             {
@@ -1181,6 +1187,75 @@ public sealed class MainWindow : Window
         }
 
         ImGui.EndTable();
+    }
+
+    private void DrawPluginIdentity(PluginEditorRow row)
+    {
+        var style = ImGui.GetStyle();
+        var layout = ProfileEditorLayout.PluginActionButtons(
+            ImGui.GetContentRegionAvail().X,
+            ImGui.CalcTextSize(row.DisplayName).X,
+            ImGui.CalcTextSize("Open").X,
+            ImGui.CalcTextSize("Settings").X,
+            style.FramePadding.X,
+            style.ItemSpacing.X);
+
+        if (layout.AlongsideName)
+        {
+            ImGui.TextUnformatted(row.DisplayName);
+            ImGui.SameLine();
+        }
+        else
+            ImGui.TextWrapped(row.DisplayName);
+
+        var openAvailable = row.Plugin is { IsLoaded: true, HasMainUi: true };
+        ImGui.BeginDisabled(!openAvailable);
+        if (ImGui.Button("Open##plugin", new Vector2(layout.OpenWidth, 0f)))
+            OpenPluginUi(row, false);
+        ImGui.EndDisabled();
+
+        if (layout.ButtonsInline)
+            ImGui.SameLine();
+
+        var settingsAvailable = row.Plugin is { IsLoaded: true, HasConfigUi: true };
+        ImGui.BeginDisabled(!settingsAvailable);
+        if (ImGui.Button("Settings##plugin", new Vector2(layout.SettingsWidth, 0f)))
+            OpenPluginUi(row, true);
+        ImGui.EndDisabled();
+
+        if (pluginUiErrorInternalName == row.InternalName && pluginUiError is not null)
+            ImGui.TextWrapped(pluginUiError);
+    }
+
+    private void OpenPluginUi(PluginEditorRow row, bool settings)
+    {
+        try
+        {
+            // Resolve the live handle on click; a cached row may be stale after a plugin reload.
+            var plugin = pluginInterface.InstalledPlugins.FirstOrDefault(candidate =>
+                candidate.InternalName.Equals(row.InternalName, StringComparison.OrdinalIgnoreCase));
+            if (plugin is null || !plugin.IsLoaded ||
+                (settings ? !plugin.HasConfigUi : !plugin.HasMainUi))
+            {
+                pluginUiErrorInternalName = row.InternalName;
+                pluginUiError = "This plugin's UI is no longer available.";
+                return;
+            }
+
+            if (settings)
+                plugin.OpenConfigUi();
+            else
+                plugin.OpenMainUi();
+
+            pluginUiErrorInternalName = null;
+            pluginUiError = null;
+        }
+        catch (Exception exception)
+        {
+            pluginUiErrorInternalName = row.InternalName;
+            pluginUiError = "Could not open this plugin. Check /xllog for details.";
+            log.Warning(exception, "Could not open the UI for plugin {InternalName}.", row.InternalName);
+        }
     }
 
     private static void DrawStatusValue(

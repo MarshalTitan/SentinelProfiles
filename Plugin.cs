@@ -47,6 +47,7 @@ public sealed class Plugin : IDalamudPlugin
         mainWindow = new MainWindow(
             Configuration,
             PluginInterface,
+            Log,
             Profiles,
             safetyPolicy,
             discovery,

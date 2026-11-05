@@ -7,6 +7,7 @@ var tests = new (string Name, Func<Task> Run)[]
 {
     ("State controls fit supported widths and UI/font scales", ProfileLayoutTests.StateControlsFit),
     ("State controls reflow at the measured fit boundary", ProfileLayoutTests.StateControlsReflowAtBoundary),
+    ("Plugin Open and Settings actions wrap at supported widths", ProfileLayoutTests.PluginActionsWrap),
     ("Blank profiles are sparse and names are case-insensitively unique", TestBlankAndNames),
     ("Profile collections cover empty, single, multiple, and long-name states", TestProfileCollectionStates),
     ("Capture creates a full snapshot except protected plugins", TestCapture),
