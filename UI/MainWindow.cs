@@ -783,7 +783,9 @@ public sealed class MainWindow : Window
             return;
         }
 
-        foreach (var profile in profiles.Profiles)
+        // A drag can reorder and persist the underlying list during this very frame.
+        // Render a snapshot so releasing the drag never invalidates this enumerator.
+        foreach (var profile in profiles.Profiles.ToArray())
         {
             var selected = profiles.SelectedProfile?.Id == profile.Id;
             var suffix = profiles.LastAppliedProfile?.Id == profile.Id ? "  • Last" : string.Empty;
@@ -1236,11 +1238,13 @@ public sealed class MainWindow : Window
     private void DrawPluginIdentity(PluginEditorRow row)
     {
         var style = ImGui.GetStyle();
+        var openLabel = PluginActionLabel("Open", FontAwesomeIcon.ExternalLinkAlt);
+        var settingsLabel = PluginActionLabel("Settings", FontAwesomeIcon.SlidersH);
         var layout = ProfileEditorLayout.PluginActionButtons(
             ImGui.GetContentRegionAvail().X,
             ImGui.CalcTextSize(row.DisplayName).X,
-            ImGui.CalcTextSize("    Open").X,
-            ImGui.CalcTextSize("    Settings").X,
+            ImGui.CalcTextSize(openLabel).X,
+            ImGui.CalcTextSize(settingsLabel).X,
             style.FramePadding.X,
             style.ItemSpacing.X);
 
@@ -1254,7 +1258,7 @@ public sealed class MainWindow : Window
 
         var openAvailable = row.Plugin is { IsLoaded: true, HasMainUi: true };
         ImGui.BeginDisabled(!openAvailable);
-        if (DrawPluginActionButton("Open", FontAwesomeIcon.ExternalLinkAlt, layout.OpenWidth))
+        if (DrawPluginActionButton(openLabel, "Open", FontAwesomeIcon.ExternalLinkAlt, layout.OpenWidth))
             OpenPluginUi(row, false);
         ImGui.EndDisabled();
 
@@ -1263,7 +1267,7 @@ public sealed class MainWindow : Window
 
         var settingsAvailable = row.Plugin is { IsLoaded: true, HasConfigUi: true };
         ImGui.BeginDisabled(!settingsAvailable);
-        if (DrawPluginActionButton("Settings", FontAwesomeIcon.SlidersH, layout.SettingsWidth))
+        if (DrawPluginActionButton(settingsLabel, "Settings", FontAwesomeIcon.SlidersH, layout.SettingsWidth))
             OpenPluginUi(row, true);
         ImGui.EndDisabled();
 
@@ -1271,20 +1275,41 @@ public sealed class MainWindow : Window
             ImGui.TextWrapped(pluginUiError);
     }
 
-    private static bool DrawPluginActionButton(string label, FontAwesomeIcon icon, float width)
+    private static string PluginActionLabel(string label, FontAwesomeIcon icon)
     {
-        // Native ImGui owns the button and its focus/activation. Draw the icon inside its
-        // leading text space with the same installed icon font used by the Core shell.
-        var clicked = ImGui.Button($"    {label}##plugin-{label}", new Vector2(width, 0f));
-        var style = ImGui.GetStyle();
+        // Reserve measured space for the glyph plus a small gap in the active text font.
+        ImGui.PushFont(UiBuilder.IconFont);
+        float iconWidth;
+        try
+        {
+            iconWidth = ImGui.CalcTextSize(icon.ToIconString()).X;
+        }
+        finally
+        {
+            ImGui.PopFont();
+        }
+
+        var spaces = " ";
+        while (ImGui.CalcTextSize(spaces).X < iconWidth + 5f * ImGuiHelpers.GlobalScale)
+            spaces += " ";
+        return spaces + label;
+    }
+
+    private static bool DrawPluginActionButton(string buttonLabel, string label, FontAwesomeIcon icon, float width)
+    {
+        // Keep the native button's focus/activation. Align the icon with its centered
+        // placeholder text so the glyph never covers the label, even in a wide row.
+        var clicked = ImGui.Button($"{buttonLabel}##plugin-{label}", new Vector2(width, 0f));
         var minimum = ImGui.GetItemRectMin();
         var maximum = ImGui.GetItemRectMax();
-        var iconWidth = ImGui.CalcTextSize("   ").X;
-        var tint = style.Colors[(int)ImGuiCol.Text];
-        tint.W *= style.Alpha;
+        var textWidth = ImGui.CalcTextSize(buttonLabel).X;
+        var placeholderWidth = ImGui.CalcTextSize(buttonLabel[..^label.Length]).X;
+        var left = minimum.X + (maximum.X - minimum.X - textWidth) * 0.5f;
+        var tint = ImGui.GetStyle().Colors[(int)ImGuiCol.Text];
+        tint.W *= ImGui.GetStyle().Alpha;
         DrawFontAwesomeIcon(icon, ImGui.GetWindowDrawList(),
-            new Vector2(minimum.X + style.FramePadding.X, minimum.Y),
-            new Vector2(minimum.X + style.FramePadding.X + iconWidth, maximum.Y),
+            new Vector2(left, minimum.Y),
+            new Vector2(left + placeholderWidth - 5f * ImGuiHelpers.GlobalScale, maximum.Y),
             tint);
         return clicked;
     }

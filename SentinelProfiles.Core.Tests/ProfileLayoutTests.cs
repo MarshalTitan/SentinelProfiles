@@ -58,8 +58,8 @@ internal static class ProfileLayoutTests
         foreach (var fontFactor in new[] { 0.85f, 1f, 1.2f })
         {
             var available = 252f * scale;
-            var open = 49f * scale * fontFactor; // Includes the icon inside the button.
-            var settings = 71f * scale * fontFactor;
+            var open = 74f * scale * fontFactor; // Includes measured icon space and label gap.
+            var settings = 98f * scale * fontFactor;
             var padding = 8f * scale;
             var gap = 8f * scale;
             var compact = ProfileEditorLayout.PluginActionButtons(
