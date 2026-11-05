@@ -33,6 +33,8 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
     public void Update()
     {
         if (disposed) return;
+        // Framework updates continue even when the configuration window is not being drawn.
+        Menu.CloseIfIdle(DateTime.UtcNow);
         if (!enabled())
         {
             if (entry is not null) entry.Shown = false;
@@ -71,12 +73,10 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
 
     private void OnEntryClicked(DtrInteractionEvent interaction)
     {
-        Menu.IsOpen = !Menu.IsOpen;
         if (Menu.IsOpen)
-        {
-            Menu.Anchor = interaction.Position;
-            Menu.RequestFocus = true;
-        }
+            Menu.IsOpen = false;
+        else
+            Menu.OpenAt(interaction.Position);
     }
 
     // Use Dalamud's window host for mouse and controller focus just like the main editor.
@@ -91,9 +91,25 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
             ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoSavedSettings |
             ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove), IDisposable
     {
+        private static readonly TimeSpan IdleTimeout = TimeSpan.FromSeconds(7);
         private readonly SentinelModernStyleScope style = new();
+        private DateTime idleDeadlineUtc;
 
-        public Vector2 Anchor { get; set; }
+        public Vector2 Anchor { get; private set; }
+
+        public void OpenAt(Vector2 anchor)
+        {
+            Anchor = anchor;
+            idleDeadlineUtc = DateTime.UtcNow + IdleTimeout;
+            IsOpen = true;
+            RequestFocus = true;
+        }
+
+        public void CloseIfIdle(DateTime nowUtc)
+        {
+            if (IsOpen && nowUtc >= idleDeadlineUtc)
+                IsOpen = false;
+        }
 
         public override void PreDraw()
         {
@@ -117,6 +133,18 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
 
         public override void Draw()
         {
+            // Reset only for actual activity inside the picker. A stationary cursor
+            // does not keep an abandoned panel on screen indefinitely.
+            var io = ImGui.GetIO();
+            if (ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) &&
+                (io.MouseDelta.LengthSquared() > 0f || io.MouseWheel != 0f ||
+                 ImGui.IsMouseClicked(ImGuiMouseButton.Left)))
+                idleDeadlineUtc = DateTime.UtcNow + IdleTimeout;
+            if (ImGui.IsWindowFocused(ImGuiFocusedFlags.RootAndChildWindows) &&
+                (ImGui.IsKeyPressed(ImGuiKey.UpArrow) || ImGui.IsKeyPressed(ImGuiKey.DownArrow) ||
+                 ImGui.IsKeyPressed(ImGuiKey.GamepadDpadUp) || ImGui.IsKeyPressed(ImGuiKey.GamepadDpadDown)))
+                idleDeadlineUtc = DateTime.UtcNow + IdleTimeout;
+
             var scale = ImGuiHelpers.GlobalScale;
             var snapshot = profiles().ToArray();
             var listHeight = MathF.Max(1f, ImGui.GetContentRegionAvail().Y -

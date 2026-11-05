@@ -1,5 +1,5 @@
-# Sentinel Profiles 0.2.1.12
+# Sentinel Profiles 0.2.1.13
 
-Fixes the quick switch list and Open Profiles button not responding to clicks. The compact Sentinel-styled picker now runs through Dalamud's window system, giving it the same mouse and controller focus handling as the main editor. Clicking a profile applies it; Open Profiles opens the full editor, and clicking the server-info entry again closes the picker.
+The compact server-info profile picker closes after seven seconds of inactivity, so it cannot remain on screen when left alone or when focus moves to another application. Mouse movement, scrolling, and keyboard/controller navigation within the picker restart the timer. Clicking the Profiles bar entry still toggles it immediately.
 
-No profile state rules, missing plugin ordering, restart behavior, or saved editor window size/position were changed. CI tests and package validation verify the build; in-game click confirmation remains pending.
+Profile application and restart behavior, Classy Sentinel, and saved editor geometry are unchanged. CI checks build and package validation; in-game timeout confirmation remains pending.
