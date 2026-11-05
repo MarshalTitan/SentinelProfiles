@@ -90,6 +90,27 @@ public sealed class ProfileService
         return duplicate;
     }
 
+    /// <summary>Reorders saved profiles without changing selection, rules, or the last applied profile.</summary>
+    public bool MoveProfile(Guid sourceId, Guid targetId, bool after)
+    {
+        var sourceIndex = configuration.Profiles.FindIndex(profile => profile.Id == sourceId);
+        var targetIndex = configuration.Profiles.FindIndex(profile => profile.Id == targetId);
+        if (sourceIndex < 0 || targetIndex < 0 || sourceIndex == targetIndex)
+            return false;
+
+        var insertionIndex = targetIndex + (after ? 1 : 0);
+        if (sourceIndex < insertionIndex)
+            insertionIndex--;
+        if (sourceIndex == insertionIndex)
+            return false;
+
+        var moving = configuration.Profiles[sourceIndex];
+        configuration.Profiles.RemoveAt(sourceIndex);
+        configuration.Profiles.Insert(insertionIndex, moving);
+        changed();
+        return true;
+    }
+
     public bool TryRename(PluginProfile profile, string requestedName, out string error)
     {
         if (!TryValidateNewName(requestedName, profile.Id, out var name, out error))

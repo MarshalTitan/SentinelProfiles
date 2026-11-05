@@ -9,9 +9,9 @@ public sealed record ProfileBarPresentation(string Text, string Tooltip)
         bool applying = false, string? applyingName = null, bool applyProblems = false)
     {
         if (applying)
-            return new("Profiles: applying", "Applying " + Clean(applyingName) + ". Open Profiles for progress.");
+            return new("Profiles: applying", "Applying " + Clean(applyingName) + ". Click to choose a profile; open Profiles for progress.");
         if (applied is null)
-            return new("Profiles: none", "No profile has been applied. Click to open Sentinel Profiles.");
+            return new("Profiles: none", "No profile has been applied. Click to choose or create a profile.");
         var name = Clean(applied.Name);
         var shortName = name.Length <= 24 ? name : name[..24] + "…";
         var warning = applyProblems || drift.State != DriftState.Matched;
@@ -19,7 +19,7 @@ public sealed record ProfileBarPresentation(string Text, string Tooltip)
             : drift.State == DriftState.Matched ? "Explicitly managed plugin states currently match."
             : $"Changed: {drift.MismatchedInternalNames.Count}; missing: {drift.MissingInternalNames.Count}.";
         return new("Profiles: " + shortName + (warning ? " !" : ""),
-            $"Last applied profile: {name}\n{status}\nSelection/editing does not apply a profile. Click to open Profiles.");
+            $"Last applied profile: {name}\n{status}\nSelection/editing does not apply a profile. Click to choose a profile to apply.");
     }
 
     private static string Clean(string? value) =>
