@@ -3,6 +3,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Game.Gui.Dtr;
 using Dalamud.Interface.Utility;
 using Dalamud.Plugin.Services;
+using SentinelCore.UI;
 using SentinelProfiles.Core;
 using SentinelProfiles.Models;
 
@@ -14,6 +15,7 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
     Func<Guid?> lastAppliedId, Func<bool> isBusy, Func<Guid, bool> apply,
     Action open, IPluginLog log) : IDisposable
 {
+    private readonly SentinelModernStyleScope menuStyle = new();
     private IDtrBarEntry? entry;
     private ProfileBarPresentation? previous;
     private DateTime nextRefresh;
@@ -77,76 +79,90 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
         var scale = ImGuiHelpers.GlobalScale;
         var display = ImGui.GetIO().DisplaySize;
         var width = MathF.Min(280f * scale, MathF.Max(1f, display.X - 16f * scale));
-        var count = profiles().Count;
-        var height = MathF.Min(MathF.Max(140f * scale, display.Y - 16f * scale),
-            MathF.Max(150f * scale, 88f * scale + count * ImGui.GetFrameHeightWithSpacing()));
+        var snapshot = profiles().ToArray();
+        var height = MathF.Min(MathF.Max(1f, display.Y - 16f * scale),
+            MathF.Max(94f * scale, 66f * scale + snapshot.Length * ImGui.GetFrameHeightWithSpacing()));
         var x = Math.Clamp(menuAnchor.X - width / 2f, 8f * scale,
             MathF.Max(8f * scale, display.X - width - 8f * scale));
         var y = Math.Clamp(menuAnchor.Y + 16f * scale, 8f * scale,
             MathF.Max(8f * scale, display.Y - height - 8f * scale));
 
-        ImGui.SetNextWindowPos(new Vector2(x, y), ImGuiCond.Appearing);
-        ImGui.SetNextWindowSize(new Vector2(width, height), ImGuiCond.Always);
-        ImGui.PushStyleVar(ImGuiStyleVar.WindowPadding, new Vector2(12f, 10f) * scale);
-        var visible = ImGui.Begin("Profiles quick switch##SentinelProfiles.DtrMenu",
-            ref quickMenuOpen,
-            ImGuiWindowFlags.NoSavedSettings | ImGuiWindowFlags.NoResize |
-            ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove);
+        // Core supplies the shared Modern colours, borders, rounding, and spacing.
+        // The bar entry is the toggle, so this compact panel needs no title bar or X.
+        menuStyle.Push(scale);
         try
         {
-            if (!visible)
-                return;
-
-            ImGui.TextDisabled(isBusy() ? "Applying a profile..." : "Choose a profile to apply");
-            ImGui.Separator();
-            var listHeight = MathF.Max(1f, ImGui.GetContentRegionAvail().Y -
-                ImGui.GetFrameHeightWithSpacing() - ImGui.GetStyle().ItemSpacing.Y);
-            if (ImGui.BeginChild("##SentinelProfiles.QuickList", new Vector2(0f, listHeight)))
+            ImGui.SetNextWindowPos(new Vector2(x, y), ImGuiCond.Always);
+            ImGui.SetNextWindowSize(new Vector2(width, height), ImGuiCond.Always);
+            var visible = ImGui.Begin("Profiles quick switch##SentinelProfiles.DtrMenu",
+                ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoSavedSettings |
+                ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoMove);
+            try
             {
-                if (count == 0)
-                    ImGui.TextWrapped("No profiles yet. Create one in Sentinel Profiles.");
+                if (!visible)
+                    return;
 
-                ImGui.BeginDisabled(isBusy());
-                foreach (var profile in profiles())
+                var listHeight = MathF.Max(1f, ImGui.GetContentRegionAvail().Y -
+                    38f * scale - ImGui.GetStyle().ItemSpacing.Y);
+                if (ImGui.BeginChild("##SentinelProfiles.QuickList", new Vector2(0f, listHeight)))
                 {
-                    var selected = lastAppliedId() == profile.Id;
-                    var label = profile.Name + (selected ? "  • Last" : "");
-                    var padding = ImGui.GetStyle().FramePadding;
-                    var widthAvailable = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
-                    var textWidth = MathF.Max(1f, widthAvailable - 2f * padding.X);
-                    var heightAvailable = MathF.Max(ImGui.GetFrameHeight(),
-                        ImGui.CalcTextSize(label, false, textWidth).Y + 2f * padding.Y);
-                    var origin = ImGui.GetCursorScreenPos();
-                    if (ImGui.Selectable($"##quick-{profile.Id:N}", selected,
-                            ImGuiSelectableFlags.None, new Vector2(widthAvailable, heightAvailable))
-                        && apply(profile.Id))
-                        quickMenuOpen = false;
+                    if (snapshot.Length == 0)
+                        ImGui.TextWrapped("No profiles yet.");
 
-                    var next = ImGui.GetCursorScreenPos();
-                    ImGui.SetCursorScreenPos(origin + padding);
-                    ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + textWidth);
-                    ImGui.TextUnformatted(label);
-                    ImGui.PopTextWrapPos();
-                    ImGui.SetCursorScreenPos(next);
+                    ImGui.BeginDisabled(isBusy());
+                    ImGui.PushStyleColor(ImGuiCol.Header, SentinelModernPalette.NavigationSelected);
+                    try
+                    {
+                        foreach (var profile in snapshot)
+                        {
+                            var selected = lastAppliedId() == profile.Id;
+                            var label = profile.Name;
+                            var padding = ImGui.GetStyle().FramePadding;
+                            var widthAvailable = MathF.Max(1f, ImGui.GetContentRegionAvail().X);
+                            var textWidth = MathF.Max(1f, widthAvailable - 2f * padding.X);
+                            var rowHeight = MathF.Max(ImGui.GetFrameHeight(),
+                                ImGui.CalcTextSize(label, false, textWidth).Y + 2f * padding.Y);
+                            var origin = ImGui.GetCursorScreenPos();
+                            if (ImGui.Selectable($"##quick-{profile.Id:N}", selected,
+                                    ImGuiSelectableFlags.None, new Vector2(widthAvailable, rowHeight))
+                                && apply(profile.Id))
+                                quickMenuOpen = false;
+
+                            var next = ImGui.GetCursorScreenPos();
+                            ImGui.SetCursorScreenPos(origin + padding);
+                            ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + textWidth);
+                            ImGui.TextUnformatted(label);
+                            ImGui.PopTextWrapPos();
+                            ImGui.SetCursorScreenPos(next);
+                        }
+                    }
+                    finally
+                    {
+                        ImGui.PopStyleColor();
+                        ImGui.EndDisabled();
+                    }
                 }
-                ImGui.EndDisabled();
-            }
-            ImGui.EndChild();
-            if (ImGui.Button("Open Profiles", new Vector2(-1f, 0f)))
-            {
-                quickMenuOpen = false;
-                open();
-            }
+                ImGui.EndChild();
+                if (SentinelModernActionDock.PrimaryButton(
+                        "SentinelProfiles.OpenProfiles", "Open Profiles", new Vector2(-1f, 0f), scale))
+                {
+                    quickMenuOpen = false;
+                    open();
+                }
 
-            if (!skipOutsideClick && ImGui.IsMouseClicked(ImGuiMouseButton.Left)
-                && !ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows))
-                quickMenuOpen = false;
-            skipOutsideClick = false;
+                if (!skipOutsideClick && ImGui.IsMouseClicked(ImGuiMouseButton.Left)
+                    && !ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows))
+                    quickMenuOpen = false;
+                skipOutsideClick = false;
+            }
+            finally
+            {
+                ImGui.End();
+            }
         }
         finally
         {
-            ImGui.End();
-            ImGui.PopStyleVar();
+            menuStyle.Pop();
         }
     }
 
@@ -155,6 +171,7 @@ public sealed class ProfileDtrBar(IDtrBar bar, Func<bool> enabled, Func<bool> lo
         if (disposed) return;
         disposed = true;
         quickMenuOpen = false;
+        menuStyle.Dispose();
         if (entry is null) return;
         entry.OnClick = null;
         entry.Remove();
