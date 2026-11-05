@@ -1,6 +1,6 @@
 # Profiles UI repair validation
 
-Version: 0.2.1.6. Scope: presentation only.
+Version: 0.2.1.9. Scope: plugin UI shortcuts and responsive presentation.
 
 ## Automated
 
@@ -10,8 +10,11 @@ Version: 0.2.1.6. Scope: presentation only.
   widths, 100/125/150/200% UI scale, and independent 85/100/120% font metrics.
 - The three Profile State controls remain inline at the supported minimum width.
 - Boundary checks require stacking only below the measured intrinsic fit width.
+- Plugin Open/Settings layout checks cover 680px minimum, long names, scale/font
+  variations, and stacked fallback at smaller transient widths.
 - CI builds against Dalamud API 15 and validates the installable ZIP.
-- No changes to Models, Core, Services, Configuration.cs, or Plugin.cs.
+- Installed plugin snapshots now report main/config UI availability; profile
+  rules, switching and restart logic are untouched.
 
 ## In-game checks (pending; not claimed by CI)
 
@@ -22,11 +25,13 @@ At 680 × 560 and 1080 × 720 logical pixels, in both themes and at 100/150/200%
    reachable with their existing busy/protection rules.
 2. Long plugin display/internal names, missing and protected rows: labels wrap;
    current state remains distinct from profile state. All three inline state buttons,
-   row selection, search/filter, and bulk controls remain reachable.
+   row selection, search/filter, and bulk controls remain reachable. Verify
+   Open and Settings invoke the matching plugin windows and remain disabled
+   for missing, unloaded, and no-UI plugins.
 3. Long apply feedback and problem lists: reach the plugin table by scrolling.
 4. Appearance: reach and activate Switch to Classic at minimum width.
 5. Keyboard/gamepad navigation: focus and activate profile entries, actions,
-   search/filter, selection, state controls, and modal buttons; scrolling follows
+   search/filter, selection, state controls, Open/Settings, and modal buttons; scrolling follows
    focus. Resize all three create/rename/delete modals, scroll each at minimum
    height, and check that fields, action buttons, and Cancel remain reachable
    at 100/150/200% UI scale, including a small display. Confirm content has

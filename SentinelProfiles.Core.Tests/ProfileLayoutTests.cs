@@ -52,6 +52,41 @@ internal static class ProfileLayoutTests
         return Task.CompletedTask;
     }
 
+    public static Task PluginActionsWrap()
+    {
+        foreach (var scale in new[] { 1f, 1.5f, 2f })
+        foreach (var fontFactor in new[] { 0.85f, 1f, 1.2f })
+        {
+            var available = 252f * scale;
+            var open = 33f * scale * fontFactor;
+            var settings = 55f * scale * fontFactor;
+            var padding = 8f * scale;
+            var gap = 8f * scale;
+            var compact = ProfileEditorLayout.PluginActionButtons(
+                available, 260f * scale, open, settings, padding, gap);
+            Assert(!compact.AlongsideName && compact.ButtonsInline,
+                "Long names should wrap above the adjacent Open and Settings controls.");
+            Assert(compact.OpenWidth + gap + compact.SettingsWidth <= available,
+                "Plugin buttons exceed the supported minimum width.");
+            Assert(compact.OpenWidth >= open + 2f * padding &&
+                   compact.SettingsWidth >= settings + 2f * padding,
+                "Plugin action labels are clipped.");
+
+            var wide = ProfileEditorLayout.PluginActionButtons(
+                800f * scale, 260f * scale, open, settings, padding, gap);
+            Assert(wide.AlongsideName && wide.ButtonsInline,
+                "Plugin name and actions should share a row when space permits.");
+
+            var tiny = ProfileEditorLayout.PluginActionButtons(
+                100f * scale, 260f * scale, open, settings, padding, gap);
+            Assert(!tiny.AlongsideName && !tiny.ButtonsInline &&
+                   tiny.OpenWidth == 100f * scale && tiny.SettingsWidth == 100f * scale,
+                "Below the supported minimum, controls should stack and fill their row.");
+        }
+
+        return Task.CompletedTask;
+    }
+
     private static void Assert(bool value, string message)
     {
         if (!value)

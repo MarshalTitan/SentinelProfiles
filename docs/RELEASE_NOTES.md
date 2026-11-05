@@ -1,8 +1,5 @@
-# Sentinel Profiles 0.2.1.8
+# Sentinel Profiles 0.2.1.9
 
-Adds a cached, versioned Hub overview contract for saved profile names/stable IDs, selected and last-applied profiles, existing match/drift status and application progress. Revision notifications replace repeated full-list polling.
+Adds Open and Settings buttons beside installed plugin names in the Profiles editor. Buttons call Dalamud's public plugin UI actions and are disabled for missing, unloaded, or unsupported windows. Names and buttons wrap when the configuration window is narrower.
 
-Hub can request that a valid profile be opened in the existing editor. This changes editor selection only; it never applies a profile, edits rules, or toggles plugins. Opening is refused during application. Unsupported/off-thread calls fail safely and providers unregister on unload.
-
-Profile management, existing apply/restart behavior, saved settings/layouts and the optional server-info-bar display remain unchanged. Core UI remains exactly 0.3.1. See docs/HUB_IPC.md for the additive public contract and acceptance checks.
-Software tests and package validation passed. Combined in-game validation with Hub 0.7.1.0 remains pending.
+Both Sentinel Modern and Classic retain the current profile rules, state controls, saved window geometry, and keyboard/controller navigation. Profile enable/disable and restart behavior are unchanged. Automated build and layout checks pass; in-game visual and input confirmation remains pending.

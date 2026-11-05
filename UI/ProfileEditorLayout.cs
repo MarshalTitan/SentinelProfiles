@@ -6,6 +6,24 @@ namespace SentinelProfiles.UI;
 /// </summary>
 public static class ProfileEditorLayout
 {
+    public static (bool AlongsideName, bool ButtonsInline, float OpenWidth, float SettingsWidth)
+        PluginActionButtons(
+            float availableWidth,
+            float nameWidth,
+            float openLabelWidth,
+            float settingsLabelWidth,
+            float framePadding,
+            float itemSpacing)
+    {
+        var width = MathF.Max(1f, availableWidth);
+        var openWidth = openLabelWidth + 2f * framePadding;
+        var settingsWidth = settingsLabelWidth + 2f * framePadding;
+        var actionsWidth = openWidth + itemSpacing + settingsWidth;
+        var buttonsInline = width >= actionsWidth;
+        return (buttonsInline && width >= nameWidth + itemSpacing + actionsWidth,
+            buttonsInline, buttonsInline ? openWidth : width, buttonsInline ? settingsWidth : width);
+    }
+
     public static float MinimumInlineWidth(
         float enableLabelWidth,
         float leaveAloneLabelWidth,

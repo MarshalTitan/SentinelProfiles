@@ -91,6 +91,14 @@ measured text and use compact spacing. At still narrower transient widths,
 they stack to keep every choice reachable. Bulk state choices use the same
 fit rule.
 
+## Plugin shortcuts (0.2.1.9)
+
+Installed plugin rows offer **Open** and **Settings** using Dalamud's public
+plugin UI actions. Buttons are disabled when a plugin is missing, unloaded, or
+does not provide the corresponding window. Names and buttons share a row when
+they fit and reflow at narrower widths. These shortcuts do not change profile
+rules or load states.
+
 ## Commands
 
 - `/sprofiles` — open or toggle the main window

@@ -9,7 +9,9 @@ public sealed record InstalledPluginInfo(
     bool IsBanned,
     bool IsOrphaned,
     bool IsDecommissioned,
-    bool IsDev)
+    bool IsDev,
+    bool HasMainUi = false,
+    bool HasConfigUi = false)
 {
     public string? GetUnsupportedReason()
     {
