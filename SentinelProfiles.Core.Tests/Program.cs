@@ -12,6 +12,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Profile collections cover empty, single, multiple, and long-name states", TestProfileCollectionStates),
     ("Capture creates a full snapshot except protected plugins", TestCapture),
     ("Duplicate is independent and deletion clears last applied", TestDuplicateAndDelete),
+    ("Saved profile order moves and persists without changing selection or rules", TestProfileReordering),
     ("Configuration data round-trips and normalizes", TestSerialization),
     ("Schema-one configurations migrate explicitly to Classic", TestThemeMigration),
     ("Modern minimized window state and expanded size persist", TestModernWindowStatePersistence),
@@ -117,6 +118,44 @@ static Task TestDuplicateAndDelete()
     Assert(hunts.GetState("Example") == ProfilePluginState.Enable, "Duplicate must be independent.");
     Assert(service.Delete(hunts), "Delete should succeed.");
     Assert(service.LastAppliedProfile is null, "Deleting last-applied profile should clear the pointer.");
+    return Task.CompletedTask;
+}
+
+static Task TestProfileReordering()
+{
+    var saves = 0;
+    var data = new ProfileConfigurationData();
+    var service = new ProfileService(data, new PluginSafetyPolicy(), () => saves++);
+    service.TryCreateBlank("Main", out var main, out _);
+    service.TryCreateBlank("Raid", out var raid, out _);
+    service.TryCreateBlank("Hunt", out var hunt, out _);
+    service.TryCreateBlank("AFK", out var afk, out _);
+    service.SetPluginState(raid!, "Example", "Example", ProfilePluginState.Enable);
+    service.MarkApplied(raid!.Id);
+    var selectedId = service.SelectedProfile!.Id;
+
+    Assert(service.MoveProfile(afk!.Id, main!.Id, false),
+        "Dragging the last profile above the first should reorder it.");
+    Assert(service.Profiles.Select(p => p.Name).SequenceEqual(["AFK", "Main", "Raid", "Hunt"]),
+        "Moving to the front should preserve the other profiles' relative order.");
+    Assert(service.MoveProfile(main.Id, hunt!.Id, true),
+        "Dragging a profile below a later target should reorder it.");
+    Assert(service.Profiles.Select(p => p.Name).SequenceEqual(["AFK", "Raid", "Hunt", "Main"]),
+        "Moving toward the end should insert after the target.");
+    Assert(!service.MoveProfile(main.Id, hunt.Id, true), "Dropping in the same place should not save.");
+    Assert(!service.MoveProfile(Guid.NewGuid(), hunt.Id, true), "Unknown source should not change order.");
+    Assert(service.SelectedProfile?.Id == selectedId &&
+           service.LastAppliedProfile?.Id == raid.Id &&
+           raid.GetState("Example") == ProfilePluginState.Enable,
+        "Reordering must not change selection, application, or plugin rules.");
+
+    var serialized = JsonSerializer.Serialize(data);
+    var reloaded = new ProfileService(
+        JsonSerializer.Deserialize<ProfileConfigurationData>(serialized)!,
+        new PluginSafetyPolicy(), () => {});
+    Assert(reloaded.Profiles.Select(p => p.Name).SequenceEqual(["AFK", "Raid", "Hunt", "Main"]),
+        "Profile order should persist through configuration serialization.");
+    Assert(saves == 8, "Only actual profile changes should be saved.");
     return Task.CompletedTask;
 }
 

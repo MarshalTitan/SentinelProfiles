@@ -1,6 +1,6 @@
 # Profiles UI repair validation
 
-Version: 0.2.1.9. Scope: plugin UI shortcuts and responsive presentation.
+Version: 0.2.1.10. Scope: profile ordering, quick apply, and button icons.
 
 ## Automated
 
@@ -12,9 +12,11 @@ Version: 0.2.1.9. Scope: plugin UI shortcuts and responsive presentation.
 - Boundary checks require stacking only below the measured intrinsic fit width.
 - Plugin Open/Settings layout checks cover 680px minimum, long names, scale/font
   variations, and stacked fallback at smaller transient widths.
+- Profile move tests verify insertion above/below a target, no-op drops, saved
+  ordering, and unchanged selection, last applied ID and plugin rules.
 - CI builds against Dalamud API 15 and validates the installable ZIP.
-- Installed plugin snapshots now report main/config UI availability; profile
-  rules, switching and restart logic are untouched.
+- The optional bar picker uses the existing application coordinator; profile
+  rules and restart switching logic are untouched.
 
 ## In-game checks (pending; not claimed by CI)
 
@@ -26,17 +28,23 @@ At 680 × 560 and 1080 × 720 logical pixels, in both themes and at 100/150/200%
 2. Long plugin display/internal names, missing and protected rows: labels wrap;
    current state remains distinct from profile state. All three inline state buttons,
    row selection, search/filter, and bulk controls remain reachable. Verify
-   Open and Settings invoke the matching plugin windows and remain disabled
-   for missing, unloaded, and no-UI plugins.
+   Open and Settings invoke the matching plugin windows, show icons within
+   their buttons, and remain disabled for missing, unloaded, and no-UI plugins.
+   Missing plugin rows remain sorted below installed plugins.
 3. Long apply feedback and problem lists: reach the plugin table by scrolling.
-4. Appearance: reach and activate Switch to Classic at minimum width.
-5. Keyboard/gamepad navigation: focus and activate profile entries, actions,
+4. Drag several profiles above and below others, restart, and verify the
+   saved order. Move Up/Down must work through keyboard/controller focus.
+   Click the server-info bar entry to open a profile picker. Apply a profile
+   from it with the editor closed; verify busy state, long names, scrolling,
+   outside-click dismissal, and Open Profiles.
+5. Appearance: reach and activate Switch to Classic at minimum width.
+6. Keyboard/gamepad navigation: focus and activate profile entries, actions,
    search/filter, selection, state controls, Open/Settings, and modal buttons; scrolling follows
    focus. Resize all three create/rename/delete modals, scroll each at minimum
    height, and check that fields, action buttons, and Cancel remain reachable
    at 100/150/200% UI scale, including a small display. Confirm content has
    a visible left and right inset in both Classic and Modern themes.
-6. Move and resize, close/reopen, switch theme, minimize/expand, reload plugin,
+7. Move and resize, close/reopen, switch theme, minimize/expand, reload plugin,
    and restart: saved geometry remains intact. Existing restart switching
    semantics are expected to remain unchanged, not to be repaired here.
 

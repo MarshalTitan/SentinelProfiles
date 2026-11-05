@@ -17,6 +17,7 @@ public sealed class MainWindow : Window
     private const float ProfilePaneWidth = 235f;
     private const float CompactStateButtonPadding = 4f;
     private const float CompactStateButtonSpacing = 4f;
+    private static readonly byte[] ProfileOrderDragMarker = [1];
     private const string ProfilesPageId = "profiles";
     private const string AppearancePageId = "appearance";
 
@@ -70,6 +71,7 @@ public sealed class MainWindow : Window
     private readonly Func<ApplyOrigin, bool> reapplyLastProfile;
     private readonly Action saveConfiguration;
     private readonly HashSet<string> selectedPlugins = new(StringComparer.OrdinalIgnoreCase);
+    private Guid? draggedProfileId;
     private readonly SentinelModernStyleScope modernStyle = new();
     private readonly SentinelModernAppShellState modernShellState = new();
     private readonly Action<string> selectModernPrimaryPage;
@@ -742,7 +744,7 @@ public sealed class MainWindow : Window
             configuration.ShowProfileInServerInfoBar = show;
             saveConfiguration();
         }
-        ImGui.TextWrapped("Shows the last applied profile. ! means plugin states differ or application reported a problem. Click the bar entry to open Profiles.");
+        ImGui.TextWrapped("Shows the last applied profile. ! means plugin states differ or application reported a problem. Click the bar entry to choose and apply a profile without opening the editor.");
     }
 
     private void DrawThemeSelector()
@@ -797,6 +799,7 @@ public sealed class MainWindow : Window
                     profiles.Select(profile.Id);
                     selectedPlugins.Clear();
                 }
+                DrawProfileReorder(profile);
                 continue;
             }
 
@@ -812,6 +815,7 @@ public sealed class MainWindow : Window
                 profiles.Select(profile.Id);
                 selectedPlugins.Clear();
             }
+            DrawProfileReorder(profile);
             var next = ImGui.GetCursorScreenPos();
             ImGui.SetCursorScreenPos(origin + padding);
             ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + textWidth);
@@ -819,6 +823,31 @@ public sealed class MainWindow : Window
             ImGui.PopTextWrapPos();
             ImGui.SetCursorScreenPos(next);
         }
+    }
+
+    private void DrawProfileReorder(PluginProfile profile)
+    {
+        if (ImGui.BeginDragDropSource())
+        {
+            draggedProfileId = profile.Id;
+            ImGui.SetDragDropPayload("SENTINEL_PROFILE_ORDER", ProfileOrderDragMarker);
+            ImGui.TextUnformatted($"Move {profile.Name}");
+            ImGui.EndDragDropSource();
+        }
+
+        if (!ImGui.BeginDragDropTarget())
+            return;
+
+        var boundsStart = ImGui.GetItemRectMin();
+        var boundsEnd = ImGui.GetItemRectMax();
+        var payload = ImGui.AcceptDragDropPayload("SENTINEL_PROFILE_ORDER");
+        if (!payload.IsNull && payload.Delivery && draggedProfileId is { } sourceId)
+        {
+            var after = ImGui.GetMousePos().Y > (boundsStart.Y + boundsEnd.Y) * 0.5f;
+            profiles.MoveProfile(sourceId, profile.Id, after);
+            draggedProfileId = null;
+        }
+        ImGui.EndDragDropTarget();
     }
 
     private void DrawProfileActions(bool modern = false)
@@ -854,6 +883,21 @@ public sealed class MainWindow : Window
             modalError = string.Empty;
             renameModalOpen = true;
         }
+
+        // Buttons keep reordering available to keyboard and controller users.
+        var selectedIndex = selectedProfile is null
+            ? -1
+            : profiles.Profiles.ToList().FindIndex(profile => profile.Id == selectedProfile.Id);
+        var moveWidth = MathF.Max(1f, (ImGui.GetContentRegionAvail().X - ImGui.GetStyle().ItemSpacing.X) / 2f);
+        ImGui.BeginDisabled(selectedIndex <= 0);
+        if (ImGui.Button("Move Up", new Vector2(moveWidth, 0f)) && selectedProfile is not null)
+            profiles.MoveProfile(selectedProfile.Id, profiles.Profiles[selectedIndex - 1].Id, false);
+        ImGui.EndDisabled();
+        ImGui.SameLine();
+        ImGui.BeginDisabled(selectedIndex < 0 || selectedIndex >= profiles.Profiles.Count - 1);
+        if (ImGui.Button("Move Down", new Vector2(moveWidth, 0f)) && selectedProfile is not null)
+            profiles.MoveProfile(selectedProfile.Id, profiles.Profiles[selectedIndex + 1].Id, true);
+        ImGui.EndDisabled();
 
         var delete = modern
             ? SentinelModernActionDock.DangerButton(
@@ -1195,8 +1239,8 @@ public sealed class MainWindow : Window
         var layout = ProfileEditorLayout.PluginActionButtons(
             ImGui.GetContentRegionAvail().X,
             ImGui.CalcTextSize(row.DisplayName).X,
-            ImGui.CalcTextSize("Open").X,
-            ImGui.CalcTextSize("Settings").X,
+            ImGui.CalcTextSize("    Open").X,
+            ImGui.CalcTextSize("    Settings").X,
             style.FramePadding.X,
             style.ItemSpacing.X);
 
@@ -1210,7 +1254,7 @@ public sealed class MainWindow : Window
 
         var openAvailable = row.Plugin is { IsLoaded: true, HasMainUi: true };
         ImGui.BeginDisabled(!openAvailable);
-        if (ImGui.Button("Open##plugin", new Vector2(layout.OpenWidth, 0f)))
+        if (DrawPluginActionButton("Open", FontAwesomeIcon.ExternalLinkAlt, layout.OpenWidth))
             OpenPluginUi(row, false);
         ImGui.EndDisabled();
 
@@ -1219,12 +1263,30 @@ public sealed class MainWindow : Window
 
         var settingsAvailable = row.Plugin is { IsLoaded: true, HasConfigUi: true };
         ImGui.BeginDisabled(!settingsAvailable);
-        if (ImGui.Button("Settings##plugin", new Vector2(layout.SettingsWidth, 0f)))
+        if (DrawPluginActionButton("Settings", FontAwesomeIcon.SlidersH, layout.SettingsWidth))
             OpenPluginUi(row, true);
         ImGui.EndDisabled();
 
         if (pluginUiErrorInternalName == row.InternalName && pluginUiError is not null)
             ImGui.TextWrapped(pluginUiError);
+    }
+
+    private static bool DrawPluginActionButton(string label, FontAwesomeIcon icon, float width)
+    {
+        // Native ImGui owns the button and its focus/activation. Draw the icon inside its
+        // leading text space with the same installed icon font used by the Core shell.
+        var clicked = ImGui.Button($"    {label}##plugin-{label}", new Vector2(width, 0f));
+        var style = ImGui.GetStyle();
+        var minimum = ImGui.GetItemRectMin();
+        var maximum = ImGui.GetItemRectMax();
+        var iconWidth = ImGui.CalcTextSize("   ").X;
+        var tint = style.Colors[(int)ImGuiCol.Text];
+        tint.W *= style.Alpha;
+        DrawFontAwesomeIcon(icon, ImGui.GetWindowDrawList(),
+            new Vector2(minimum.X + style.FramePadding.X, minimum.Y),
+            new Vector2(minimum.X + style.FramePadding.X + iconWidth, maximum.Y),
+            tint);
+        return clicked;
     }
 
     private void OpenPluginUi(PluginEditorRow row, bool settings)

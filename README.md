@@ -99,6 +99,19 @@ does not provide the corresponding window. Names and buttons share a row when
 they fit and reflow at narrower widths. These shortcuts do not change profile
 rules or load states.
 
+## Profile order and quick switching (0.2.1.10)
+
+Drag saved profiles to reorder the sidebar; their order persists with the existing
+configuration. Move Up and Move Down provide keyboard/controller alternatives.
+Installed plugins still sort before missing plugins in the editor.
+
+The optional **Profiles: ...** server-info entry opens a small, scrollable
+profile picker. Choosing a profile applies it immediately with the existing
+switching engine, without opening the editor; unavailable controls are disabled
+while an application is underway. **Open Profiles** opens the full editor.
+Plugin Open and Settings buttons now carry inline vector icons that stay visible
+at supported narrow window widths.
+
 ## Commands
 
 - `/sprofiles` — open or toggle the main window
