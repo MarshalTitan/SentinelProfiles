@@ -1,5 +1,5 @@
-# Sentinel Profiles 0.2.1.13
+# Sentinel Profiles 0.2.1.14
 
-The compact server-info profile picker closes after seven seconds of inactivity, so it cannot remain on screen when left alone or when focus moves to another application. Mouse movement, scrolling, and keyboard/controller navigation within the picker restart the timer. Clicking the Profiles bar entry still toggles it immediately.
+Fixes an editor crash when Dalamud's local SQLite configuration database briefly reports "database is locked" during a profile selection or other settings save. The new save queue keeps the latest configuration in memory, retries with bounded backoff, and confirms recovery after a prolonged lock. An unresolved lock reports that settings remain unsaved rather than silently claiming persistence. Unrelated database/write errors are not swallowed.
 
-Profile application and restart behavior, Classy Sentinel, and saved editor geometry are unchanged. CI checks build and package validation; in-game timeout confirmation remains pending.
+This does not synchronize profiles between computers or FFXIV characters. The editor selection remains local configuration; profile application and restart behavior are unchanged. Core retry tests and installable-package validation run in CI; a live SQLite contention scenario remains to be tested in game.

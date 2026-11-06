@@ -1,6 +1,6 @@
 # Profiles UI repair validation
 
-Version: 0.2.1.13. Scope: quick switch seven-second inactivity timeout.
+Version: 0.2.1.14. Scope: recover transient Dalamud configuration database locks.
 
 ## Automated
 
@@ -16,6 +16,8 @@ Version: 0.2.1.13. Scope: quick switch seven-second inactivity timeout.
   ordering, and unchanged selection, last applied ID and plugin rules.
 - Sidebar rendering iterates a snapshot, so a drop that saves a new order within
   the draw frame cannot invalidate the current profile enumerator.
+- Simulated SQLite lock tests verify delayed retries, coalescing the latest edit,
+  recovery, immediate normal saves, and propagation of unrelated write errors.
 - CI builds against Dalamud API 15 and validates the installable ZIP.
 - The quick switch is registered with the same Dalamud WindowSystem as the
   main editor. Its profile selection uses the existing application coordinator;
@@ -53,7 +55,10 @@ At 680 × 560 and 1080 × 720 logical pixels, in both themes and at 100/150/200%
    height, and check that fields, action buttons, and Cancel remain reachable
    at 100/150/200% UI scale, including a small display. Confirm content has
    a visible left and right inset in both Classic and Modern themes.
-7. Move and resize, close/reopen, switch theme, minimize/expand, reload plugin,
+7. Select a different profile while another application is using the local
+   configuration database: no window render error; pending edits save once the
+   lock clears. A lasting lock warns in chat. Other save failures remain visible.
+8. Move and resize, close/reopen, switch theme, minimize/expand, reload plugin,
    and restart: saved geometry remains intact. Existing restart switching
    semantics are expected to remain unchanged, not to be repaired here.
 

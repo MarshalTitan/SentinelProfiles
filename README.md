@@ -99,7 +99,7 @@ does not provide the corresponding window. Names and buttons share a row when
 they fit and reflow at narrower widths. These shortcuts do not change profile
 rules or load states.
 
-## Profile order and quick switching (0.2.1.13)
+## Profile order and quick switching (0.2.1.14)
 
 Drag saved profiles to reorder the sidebar without interrupting the editor; their order persists with the existing
 configuration. Move Up and Move Down provide keyboard/controller alternatives.
@@ -115,6 +115,11 @@ switching engine, without opening the editor; unavailable controls are disabled
 while an application is underway. **Open Profiles** opens the full editor.
 Plugin Open and Settings buttons carry inline vector icons with measured spacing
 so their labels stay clear at supported narrow window widths.
+
+When Dalamud's local configuration database is temporarily locked, Profiles
+keeps the latest edits in memory and retries saving with backoff. A persistent
+lock displays an unsaved-settings warning; successful recovery confirms the
+pending save. A save is attempted once more when the plugin unloads.
 
 ## Commands
 
