@@ -13,6 +13,7 @@ var tests = new (string Name, Func<Task> Run)[]
     ("Capture creates a full snapshot except protected plugins", TestCapture),
     ("Duplicate is independent and deletion clears last applied", TestDuplicateAndDelete),
     ("Saved profile order moves and persists without changing selection or rules", TestProfileReordering),
+    ("SQLite lock retries keep the latest profile settings and reject other errors", TestConfigurationSaveRetries),
     ("Configuration data round-trips and normalizes", TestSerialization),
     ("Schema-one configurations migrate explicitly to Classic", TestThemeMigration),
     ("Modern minimized window state and expanded size persist", TestModernWindowStatePersistence),
@@ -52,6 +53,63 @@ if (failures.Count > 0)
 
 Console.WriteLine($"All {tests.Length} core tests passed.");
 return 0;
+
+static Task TestConfigurationSaveRetries()
+{
+    var start = new DateTime(2026, 11, 6, 0, 0, 0, DateTimeKind.Utc);
+    var current = "Main";
+    var saved = "";
+    var attempts = 0;
+    var deferred = 0;
+    var recovered = 0;
+    var queue = new ConfigurationSaveQueue(
+        () =>
+        {
+            attempts++;
+            if (attempts <= 2)
+                throw new SQLite.SQLiteException("database is locked");
+            saved = current;
+        },
+        (_, failures) => deferred = failures,
+        () => recovered++);
+
+    queue.Request(start);
+    Assert(queue.Pending && attempts == 1 && deferred == 1, "First locked save must remain pending.");
+    current = "Raid";
+    queue.Request(start.AddMilliseconds(500));
+    Assert(attempts == 1, "Edits during backoff must not hammer the locked database.");
+    queue.RetryIfDue(start.AddMilliseconds(999));
+    Assert(attempts == 1, "First retry must not run before the one-second deadline.");
+    queue.RetryIfDue(start.AddSeconds(1));
+    Assert(queue.Pending && attempts == 2 && deferred == 2, "A second lock must schedule another retry.");
+    queue.RetryIfDue(start.AddSeconds(2));
+    Assert(attempts == 2, "The second retry must wait two seconds.");
+    queue.RetryIfDue(start.AddSeconds(3));
+    Assert(!queue.Pending && attempts == 3 && saved == "Raid" && recovered == 1,
+        "Recovery must persist the latest in-memory state and clear the pending flag.");
+
+    current = "Hunt";
+    queue.Request(start.AddSeconds(4));
+    Assert(!queue.Pending && attempts == 4 && saved == "Hunt",
+        "Normal saves must still persist immediately after recovery.");
+    Assert(!ConfigurationSaveQueue.IsDatabaseLocked(new InvalidOperationException("database is locked")),
+        "Other exception types must not be suppressed by their message.");
+    Assert(!ConfigurationSaveQueue.IsDatabaseLocked(new SQLite.SQLiteException("disk I/O error")),
+        "Other SQLite failures must not be swallowed.");
+
+    var unrelated = new ConfigurationSaveQueue(() => throw new SQLite.SQLiteException("disk I/O error"));
+    try
+    {
+        unrelated.Request(start);
+        throw new InvalidOperationException("A non-lock save error was swallowed.");
+    }
+    catch (SQLite.SQLiteException exception) when (exception.Message == "disk I/O error")
+    {
+        // Caller still handles permanent failures.
+    }
+
+    return Task.CompletedTask;
+}
 
 static Task TestBlankAndNames()
 {

@@ -31,12 +31,18 @@ public sealed class Plugin : IDalamudPlugin
     private readonly DriftDetector driftDetector;
     private readonly MainWindow mainWindow;
     private readonly ProfileDtrBar profileBar;
+    private readonly ConfigurationSaveQueue configurationSaves;
+    private bool pendingSaveWarningShown;
     private readonly HubProfilesIpc? hubIpc;
     private DateTime nextDisplayNameRefreshUtc = DateTime.MinValue;
 
     public Plugin()
     {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        configurationSaves = new ConfigurationSaveQueue(
+            () => PluginInterface.SavePluginConfig(Configuration),
+            OnConfigurationSaveDeferred,
+            OnConfigurationSaveRecovered);
         safetyPolicy = new PluginSafetyPolicy();
         Profiles = new ProfileService(Configuration, safetyPolicy, SaveConfiguration);
         discovery = new InstalledPluginDiscoveryService(PluginInterface, Log);
@@ -98,6 +104,19 @@ public sealed class Plugin : IDalamudPlugin
     public void Dispose()
     {
         Framework.Update -= OnFrameworkUpdate;
+        // Give a pending lock one final chance to persist before unloading.
+        if (configurationSaves.Pending)
+        {
+            try
+            {
+                if (!configurationSaves.RetryIfDue(DateTime.UtcNow, force: true))
+                    Log.Error("Sentinel Profiles configuration is still unsaved because Dalamud's database is locked.");
+            }
+            catch (Exception exception)
+            {
+                Log.Error(exception, "Could not save Sentinel Profiles configuration during unload.");
+            }
+        }
         PluginInterface.UiBuilder.Draw -= windows.Draw;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainWindow;
         PluginInterface.UiBuilder.OpenConfigUi -= OpenMainWindow;
@@ -114,12 +133,31 @@ public sealed class Plugin : IDalamudPlugin
 
     public void SaveConfiguration()
     {
-        PluginInterface.SavePluginConfig(Configuration);
         hubIpc?.Invalidate();
+        configurationSaves.Request(DateTime.UtcNow);
+    }
+
+    private void OnConfigurationSaveDeferred(Exception exception, int consecutiveLocks)
+    {
+        if (consecutiveLocks == 1)
+            Log.Warning(exception, "Dalamud's configuration database is locked. Profiles settings will be retried.");
+        if (consecutiveLocks < 3 || pendingSaveWarningShown)
+            return;
+
+        pendingSaveWarningShown = true;
+        ChatGui.PrintError("[Sentinel Profiles] Settings have not saved yet because Dalamud's database is locked. Retrying automatically.");
+    }
+
+    private void OnConfigurationSaveRecovered()
+    {
+        if (pendingSaveWarningShown)
+            ChatGui.Print("[Sentinel Profiles] Pending settings saved.");
+        pendingSaveWarningShown = false;
     }
 
     private void OnFrameworkUpdate(IFramework _)
     {
+        configurationSaves.RetryIfDue(DateTime.UtcNow);
         discovery.RefreshIfDue();
         if (DateTime.UtcNow >= nextDisplayNameRefreshUtc)
         {
