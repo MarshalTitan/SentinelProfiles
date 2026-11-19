@@ -1,3 +1,7 @@
+# 0.2.1.15
+
+Privacy maintenance: bundle Core 0.3.1.1 with project copyright attribution. Runtime source, configuration, and gameplay behavior are unchanged.
+
 # Sentinel Profiles 0.2.1.14
 
 Fixes an editor crash when Dalamud's local SQLite configuration database briefly reports "database is locked" during a profile selection or other settings save. The new save queue keeps the latest configuration in memory, retries with bounded backoff, and confirms recovery after a prolonged lock. An unresolved lock reports that settings remain unsaved rather than silently claiming persistence. Unrelated database/write errors are not swallowed.
