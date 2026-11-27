@@ -251,6 +251,7 @@ public sealed class MainWindow : Window
             Status = GetModernStatusPill(),
             RequestCollapse = requestModernCollapse,
             CollapseTooltip = configuration.ModernWindowCollapsed ? "Expand" : "Minimize",
+                IsCollapsed = configuration.ModernWindowCollapsed,
             RequestClose = requestModernClose,
         };
 
@@ -589,7 +590,7 @@ public sealed class MainWindow : Window
     private string GetModernContextLabel()
         => modernPage == ModernPage.Appearance
             ? "Appearance"
-            : profiles.SelectedProfile?.Name ?? "Profiles";
+            : profiles.SelectedProfile is { } selected ? $"Profiles - {selected.Name}" : "Profiles";
 
     private void SelectModernPrimaryPage(string id)
         => modernPage = id switch
