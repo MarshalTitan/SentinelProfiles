@@ -437,9 +437,7 @@ public sealed class MainWindow : Window
         var profile = profiles.SelectedProfile;
         if (profile is null)
         {
-            SentinelModernUi.PageHeading(
-                "Profiles",
-                "Create a profile to begin. Blank profiles leave every plugin alone until you choose otherwise.");
+            ImGui.TextWrapped("Create a profile to begin. Blank profiles leave every plugin alone until you choose otherwise.");
             ImGui.Spacing();
             using var emptyCard = SentinelModernGlassCard.Begin(
                 "SentinelProfiles.Modern2.Empty",
@@ -507,9 +505,7 @@ public sealed class MainWindow : Window
 
     private void DrawModernAppearancePage()
     {
-        SentinelModernUi.PageHeading(
-            "Appearance",
-            "Choose the presentation for this window without changing any profile or plugin state.");
+        ImGui.TextWrapped("Choose the presentation for this window without changing any profile or plugin state.");
         ImGui.Spacing();
         using var card = SentinelModernGlassCard.Begin(
             "SentinelProfiles.Modern2.Appearance",
@@ -590,7 +586,7 @@ public sealed class MainWindow : Window
     private string GetModernContextLabel()
         => modernPage == ModernPage.Appearance
             ? "Appearance"
-            : profiles.SelectedProfile is { } selected ? $"Profiles - {selected.Name}" : "Profiles";
+            : "Profiles";
 
     private void SelectModernPrimaryPage(string id)
         => modernPage = id switch
