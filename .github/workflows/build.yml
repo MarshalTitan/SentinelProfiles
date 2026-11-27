@@ -31,6 +31,10 @@ jobs:
           Invoke-WebRequest -Uri 'https://goatcorp.github.io/dalamud-distrib/latest.zip' -OutFile $archive
           Expand-Archive -LiteralPath $archive -DestinationPath $dalamudDir -Force
 
+      - name: Prepare immutable navigation UI packages
+        shell: pwsh
+        run: ./.github/scripts/Prepare-NavigationCore.ps1
+
       - name: Restore locked dependencies
         run: dotnet restore SentinelProfiles.csproj --locked-mode
 
